@@ -13,7 +13,6 @@ from .orchestrator import HorizonOrchestrator
 
 
 console = Console()
-DEFAULT_OUTPUT = "/Users/wjb/Workspace/daily"
 
 
 def print_banner():
@@ -38,7 +37,7 @@ def main():
     parser = argparse.ArgumentParser(description="Horizon - AI-Driven Information Aggregation System")
     parser.add_argument("--hours", type=int, help="Force fetch from last N hours")
     parser.add_argument("--trending", action="store_true", help="Enable OSS Insight trending repos in this run")
-    parser.add_argument("--output", type=str, default=DEFAULT_OUTPUT, help=f"Output directory for reports (default: {DEFAULT_OUTPUT})")
+    parser.add_argument("--output", type=str, default=None, help="Output directory for reports (default: data/summaries/)")
     parser.add_argument("--quiet", action="store_true", help="Suppress banner and progress output")
     args = parser.parse_args()
 
