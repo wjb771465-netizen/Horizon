@@ -1,15 +1,15 @@
 name: Daily Horizon Summary
 
 on:
-  # schedule:
-  #   - cron: '0 0 */2 * *'  # Runs every 2 days at 00:00 UTC
-  workflow_dispatch:      # Allow manual trigger
+  schedule:
+    - cron: '0 22 */3 * *'  # Every 3 days at 06:00 UTC+8
+  workflow_dispatch:
 
 jobs:
   daily-summary:
     runs-on: ubuntu-latest
     permissions:
-      contents: write  # Needed to commit changes
+      contents: write
 
     steps:
       - name: Checkout code
@@ -28,23 +28,24 @@ jobs:
 
       - name: Run Horizon
         env:
-          # Map secrets to environment variables expected by config.json
-          # Modify these based on your config.json provider settings
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
-          LWN_KEY: ${{ secrets.LWN_KEY }}
-        run: uv run horizon --hours 48
+          SILICONFLOW_API_KEY: ${{ secrets.SILICONFLOW_API_KEY }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+        run: uv run horizon --quiet
 
-      - name: Set current date as environment variable
-        run: echo "DATE=$(date +'%Y-%m-%d')" >> $GITHUB_ENV
+      - name: Run Trending
+        env:
+          SILICONFLOW_API_KEY: ${{ secrets.SILICONFLOW_API_KEY }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+        run: uv run horizon-trending
 
-      - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v4
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./docs
-          keep_files: true  # Keep existing summaries on gh-pages branch
-          commit_message: "📝 Daily Summary: ${{ env.DATE }}"
-          publish_branch: gh-pages
-          enable_jekyll: true
+      - name: Commit and push reports
+        run: |
+          git add -f data/summaries/*.md
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git commit -m "chore: daily report $(date +'%Y-%m-%d')"
+            git push
+          fi
