@@ -13,6 +13,7 @@ from .orchestrator import HorizonOrchestrator
 
 
 console = Console()
+DEFAULT_OUTPUT = "/Users/wjb/Workspace/daily"
 
 
 def print_banner():
@@ -33,23 +34,23 @@ def print_banner():
 
 def main():
     """Main CLI entry point."""
-    print_banner()
 
     parser = argparse.ArgumentParser(description="Horizon - AI-Driven Information Aggregation System")
     parser.add_argument("--hours", type=int, help="Force fetch from last N hours")
+    parser.add_argument("--trending", action="store_true", help="Enable OSS Insight trending repos in this run")
+    parser.add_argument("--output", type=str, default=DEFAULT_OUTPUT, help=f"Output directory for reports (default: {DEFAULT_OUTPUT})")
+    parser.add_argument("--quiet", action="store_true", help="Suppress banner and progress output")
     args = parser.parse_args()
 
+    if not args.quiet:
+        print_banner()
+
     try:
-        # Load environment variables from .env file
         load_dotenv()
 
-        # Ensure we're in the project directory or use data/ in current dir
         data_dir = Path("data")
-
-        # Initialize storage manager
         storage = StorageManager(data_dir=str(data_dir))
 
-        # Load configuration
         try:
             config = storage.load_config()
         except FileNotFoundError:
@@ -67,8 +68,11 @@ def main():
             console.print(f"[bold red]❌ Error loading configuration: {e}[/bold red]")
             sys.exit(1)
 
-        # Create and run orchestrator
-        orchestrator = HorizonOrchestrator(config, storage)
+        # Enable OSS Insight trending if --trending flag is set
+        if args.trending:
+            config.sources.ossinsight.enabled = True
+
+        orchestrator = HorizonOrchestrator(config, storage, output_dir=args.output, quiet=args.quiet)
         asyncio.run(orchestrator.run(force_hours=args.hours))
 
     except KeyboardInterrupt:

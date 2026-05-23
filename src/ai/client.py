@@ -3,6 +3,8 @@
 import os
 from abc import ABC, abstractmethod
 from typing import Optional
+
+import httpx
 from openai import AsyncAzureOpenAI, AsyncOpenAI
 from anthropic import AsyncAnthropic
 from google import genai
@@ -136,7 +138,10 @@ class OpenAIClient(AIClient):
             else:
                 raise ValueError(f"Missing API key: {config.api_key_env}")
 
-        kwargs = {"api_key": api_key}
+        timeout = config.request_timeout if config.request_timeout > 0 else None
+        kwargs: dict = {"api_key": api_key}
+        if timeout is not None:
+            kwargs["timeout"] = httpx.Timeout(timeout, connect=10.0)
         base_url = config.base_url or self._DEFAULT_BASE_URLS.get(config.provider.value)
         if base_url:
             kwargs["base_url"] = base_url
@@ -149,6 +154,40 @@ class OpenAIClient(AIClient):
         # Some newer models (e.g. Claude Opus 4.7 on Bedrock Converse) reject
         # `temperature`. We learn this on first 400 and stop sending it.
         self._supports_temperature = True
+
+        # Build fallback client if configured
+        self._fallback: Optional[OpenAIClient] = None
+        fb_cfg = config.fallback
+        if fb_cfg:
+            fb_provider = AIProvider(fb_cfg.get("provider", "deepseek"))
+            fb_model = fb_cfg.get("model", "deepseek-chat")
+            fb_key_env = fb_cfg.get("api_key_env", "DEEPSEEK_API_KEY")
+            fb_key = os.getenv(fb_key_env)
+            if fb_key:
+                fb_kwargs: dict = {"api_key": fb_key}
+                fb_base = fb_cfg.get("base_url") or self._DEFAULT_BASE_URLS.get(fb_provider.value)
+                if fb_base:
+                    fb_kwargs["base_url"] = fb_base
+                fb_timeout = fb_cfg.get("request_timeout", 30.0)
+                if fb_timeout > 0:
+                    fb_kwargs["timeout"] = httpx.Timeout(fb_timeout, connect=10.0)
+                fb_client = AsyncOpenAI(**fb_kwargs)
+                fallback_config = AIConfig(
+                    provider=fb_provider,
+                    model=fb_model,
+                    base_url=fb_cfg.get("base_url", ""),
+                    api_key_env=fb_key_env,
+                    temperature=config.temperature,
+                    max_tokens=config.max_tokens,
+                )
+                self._fallback = OpenAIClient.__new__(OpenAIClient)
+                self._fallback.config = fallback_config
+                self._fallback.client = fb_client
+                self._fallback.model = fb_model
+                self._fallback.temperature = config.temperature
+                self._fallback.max_tokens = config.max_tokens
+                self._fallback.provider = fb_provider.value
+                self._fallback._supports_temperature = True
 
     async def complete(
         self,
@@ -175,6 +214,30 @@ class OpenAIClient(AIClient):
         if self.provider in self._TEMP_CLAMP and temperature <= 0:
             temperature = 0.01
 
+        try:
+            return await self._try_complete(
+                system=system, user=user,
+                temperature=temperature, max_tokens=max_tokens,
+            )
+        except Exception as exc:
+            if self._fallback is not None and self._is_timeout_or_network(exc):
+                record_usage(
+                    f"{self.provider}→fallback",
+                    input_tokens=0, output_tokens=0,
+                )
+                return await self._fallback._try_complete(
+                    system=system, user=user,
+                    temperature=temperature, max_tokens=max_tokens,
+                )
+            raise
+
+    async def _try_complete(
+        self,
+        system: str,
+        user: str,
+        temperature: float,
+        max_tokens: int,
+    ) -> str:
         try:
             response = await self._do_request(
                 system=system,
@@ -237,6 +300,15 @@ class OpenAIClient(AIClient):
             or "not support" in lowered
             or "unsupported" in lowered
         )
+
+    @staticmethod
+    def _is_timeout_or_network(exc: Exception) -> bool:
+        """Check if exception is timeout or network-related (should trigger fallback)."""
+        msg = str(exc).lower()
+        # OpenAI SDK wraps httpx/network errors
+        timeout_keywords = ("timeout", "timed out", "connection", "connecterror",
+                           "readerror", "network", "eof", "reset by peer")
+        return any(kw in msg for kw in timeout_keywords)
 
 
 class AzureOpenAIClient(AIClient):

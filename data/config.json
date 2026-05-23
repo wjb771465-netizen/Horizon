@@ -1,12 +1,18 @@
 {
   "version": "1.0",
   "ai": {
-    "provider": "deepseek",
-    "model": "deepseek-v4-flash",
-    "base_url": "https://api.deepseek.com",
-    "api_key_env": "OPENAI_API_KEY",
+    "provider": "openai",
+    "model": "deepseek-ai/DeepSeek-V4-Flash",
+    "base_url": "https://api.siliconflow.cn/v1",
+    "api_key_env": "SILICONFLOW_API_KEY",
     "temperature": 0.3,
     "max_tokens": 8192,
+    "request_timeout": 15.0,
+    "fallback": {
+      "provider": "deepseek",
+      "model": "deepseek-chat",
+      "api_key_env": "DEEPSEEK_API_KEY"
+    },
     "languages": [
       "zh",
       "en"
@@ -19,6 +25,11 @@
       {
         "type": "user_events",
         "username": "karpathy",
+        "enabled": true
+      },
+      {
+        "type": "user_events",
+        "username": "ggerganov",
         "enabled": true
       },
       {
@@ -53,50 +64,41 @@
         "category": "ai-tools"
       },
       {
-        "name": "GitHub Trending - Daily",
-        "url": "https://mshibanami.github.io/GitHubTrendingRSS/daily/all.xml",
-        "enabled": true,
-        "category": "github-trending"
+        "name": "Hugging Face Blog",
+        "url": "https://huggingface.co/blog/feed.xml",
+        "enabled": false,
+        "category": "ai-ml"
       },
       {
-        "name": "LWN.net",
-        "url": "https://lwn.net/headlines/full_text?key=${LWN_KEY}",
+        "name": "OpenAI Blog",
+        "url": "https://openai.com/blog/rss.xml",
         "enabled": true,
-        "category": "linux-kernel"
+        "category": "ai-industry"
+      },
+      {
+        "name": "Anthropic Research",
+        "url": "https://www.anthropic.com/research/feed",
+        "enabled": false,
+        "category": "ai-research"
       }
     ],
     "reddit": {
-      "enabled": true,
-      "subreddits": [
-        {
-          "subreddit": "MachineLearning",
-          "enabled": true,
-          "sort": "hot",
-          "time_filter": "day",
-          "fetch_limit": 15,
-          "min_score": 60
-        },
-        {
-          "subreddit": "LocalLLaMA",
-          "enabled": true,
-          "sort": "hot",
-          "time_filter": "day",
-          "fetch_limit": 15,
-          "min_score": 60
-        }
-      ],
+      "enabled": false,
+      "subreddits": [],
       "users": [],
       "fetch_comments": 10
     },
     "telegram": {
-      "enabled": true,
-      "channels": [
-        {
-          "channel": "zaihuapd",
-          "enabled": true,
-          "fetch_limit": 20
-        }
-      ]
+      "enabled": false,
+      "channels": []
+    },
+    "ossinsight": {
+      "enabled": false,
+      "period": "past_24_hours",
+      "languages": ["All", "Python", "TypeScript", "Rust"],
+      "keywords": ["llm", "gpt", "rag", "agent", "inference", "cuda", "triton", "vector", "diffusion", "transformer", "embedding", "vllm", "sglang"],
+      "min_stars": 10,
+      "max_items": 30
     }
   },
   "filtering": {
@@ -104,7 +106,7 @@
     "time_window_hours": 24
   },
   "webhook": {
-    "enabled": true,
+    "enabled": false,
     "url_env": "HORIZON_WEBHOOK_URL",
     "delivery": "summary_and_items",
     "overview_position": "last",

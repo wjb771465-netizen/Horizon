@@ -69,6 +69,10 @@ class AIConfig(BaseModel):
     # Azure OpenAI specific; required when provider == AZURE
     azure_endpoint_env: Optional[str] = None
     api_version: Optional[str] = None
+    # Timeout in seconds for each AI request (0 = no timeout)
+    request_timeout: float = 25.0
+    # Fallback AI config when primary times out (provider/model/base_url/api_key_env)
+    fallback: Optional[dict] = None
 
 
 class GitHubSourceConfig(BaseModel):
