@@ -342,6 +342,7 @@ For setup details, see the [Configuration Guide](docs/configuration.md). For MCP
 | [Configuration](docs/configuration.md) | AI providers, sources, filtering, email, webhook, GitHub Pages, and MCP setup |
 | [Scoring](docs/scoring.md) | How Horizon evaluates and ranks news items |
 | [Scrapers](docs/scrapers.md) | Source scraper details and extension notes |
+| [Extractors](docs/extractors.md) | Full article extraction for RSS sources |
 | [MCP Tools](src/mcp/README.md) | Tool reference for MCP-compatible clients |
 
 ## Project Status
