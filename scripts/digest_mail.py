@@ -96,6 +96,29 @@ def extract_trending_top(path: Path, limit: int = 5) -> list[str]:
     return lines
 
 
+def _send_netease_imap_id(mail: imaplib.IMAP4, host: str) -> None:
+    """163/126 require IMAP ID before SELECT, else 'Unsafe Login'."""
+    if not any(h in host for h in ("163.com", "126.com", "yeah.net", "188.com")):
+        return
+    imaplib.Commands["ID"] = ("AUTH",)
+    mail._simple_command(
+        "ID",
+        '("name" "HorizonDigest" "version" "1.0" "vendor" "Horizon")',
+    )
+
+
+def hosts_for_address(addr: str) -> tuple[str, str]:
+    """Return (smtp_host, imap_host) from mailbox domain."""
+    domain = addr.rsplit("@", 1)[-1].lower()
+    if domain in ("163.com", "126.com", "yeah.net", "188.com"):
+        # 126/yeah/188 share the same product family; use matching hosts.
+        base = domain
+        return f"smtp.{base}", f"imap.{base}"
+    if domain in ("qq.com", "foxmail.com"):
+        return "smtp.qq.com", "imap.qq.com"
+    return "smtp.qq.com", "imap.qq.com"
+
+
 def filter_inbox(
     imap_host: str,
     imap_port: int,
@@ -107,6 +130,7 @@ def filter_inbox(
     mail = imaplib.IMAP4_SSL(imap_host, imap_port)
     try:
         mail.login(user, password)
+        _send_netease_imap_id(mail, imap_host)
         mail.select("INBOX")
         status, data = mail.search(None, "UNSEEN")
         if status != "OK" or not data or not data[0]:
@@ -200,11 +224,13 @@ def main() -> None:
     password = _require("EMAIL_PASSWORD")
     from_addr = _require("DIGEST_FROM")
     to_addr = _require("DIGEST_TO")
-    smtp_host = os.environ.get("SMTP_SERVER", "smtp.qq.com")
+    default_smtp, default_imap = hosts_for_address(from_addr)
+    smtp_host = os.environ.get("SMTP_SERVER", default_smtp)
     smtp_port = int(os.environ.get("SMTP_PORT", "465"))
-    imap_host = os.environ.get("IMAP_SERVER", "imap.qq.com")
+    imap_host = os.environ.get("IMAP_SERVER", default_imap)
     imap_port = int(os.environ.get("IMAP_PORT", "993"))
     sender_name = os.environ.get("DIGEST_SENDER_NAME", "Horizon Digest")
+    print(f"using smtp={smtp_host} imap={imap_host}")
 
     blocked = load_blocked()
     filtered = filter_inbox(imap_host, imap_port, from_addr, password, blocked)
