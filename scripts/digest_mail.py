@@ -29,8 +29,14 @@ ROOT = Path(__file__).resolve().parents[1]
 SUMMARIES = ROOT / "data" / "summaries"
 BLOCKED_PATH = ROOT / "data" / "mail_blocked.json"
 
-TOC_RE = re.compile(r"^\d+\.\s+\[(.+?)\]\([^)]*\)(.*)$")
 DATE_RE = re.compile(r"^horizon-(\d{4}-\d{2}-\d{2})-(zh|en|trending)\.md$")
+ITEM_HEAD_RE = re.compile(
+    r"^##\s+\[(.+?)\]\(([^)]+)\)\s*(.*)$"
+)
+TREND_HEAD_RE = re.compile(
+    r"^###\s+[^\[]*\[([^\]]+)\]\(([^)]+)\)\s*$"
+)
+THEME_RE = re.compile(r"^\*\*今日主题[：:]\s*(.+?)\*\*\s*$")
 
 
 def _require(name: str) -> str:
@@ -44,6 +50,13 @@ def _decode_mime(raw: str | None) -> str:
     if not raw:
         return ""
     return str(make_header(decode_header(raw)))
+
+
+def _clip(text: str, max_chars: int = 280) -> str:
+    text = re.sub(r"\s+", " ", text).strip()
+    if len(text) <= max_chars:
+        return text
+    return text[: max_chars - 1].rstrip() + "…"
 
 
 def load_blocked() -> list[str]:
@@ -68,33 +81,92 @@ def latest_summary(suffix: str) -> Path | None:
     return best[1] if best else None
 
 
-def extract_toc(path: Path, limit: int = 8) -> list[str]:
-    lines: list[str] = []
-    for line in path.read_text(encoding="utf-8").splitlines():
-        m = TOC_RE.match(line.strip())
+def extract_zh_items(path: Path, limit: int = 6) -> list[dict[str, str]]:
+    """Title + score + first body paragraph for each news item."""
+    items: list[dict[str, str]] = []
+    lines = path.read_text(encoding="utf-8").splitlines()
+    i = 0
+    while i < len(lines) and len(items) < limit:
+        m = ITEM_HEAD_RE.match(lines[i].strip())
         if not m:
-            if lines:
-                break
+            i += 1
             continue
-        title, rest = m.group(1), m.group(2).strip()
-        lines.append(f"- {title}{(' ' + rest) if rest else ''}")
-        if len(lines) >= limit:
-            break
-    return lines
-
-
-def extract_trending_top(path: Path, limit: int = 5) -> list[str]:
-    lines: list[str] = []
-    for line in path.read_text(encoding="utf-8").splitlines():
-        if line.startswith("### ") and any(ch.isdigit() for ch in line[:8]):
-            # e.g. ### 1️⃣ [repo](url)
-            title = re.sub(r"^###\s+", "", line)
-            title = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", title)
-            lines.append(f"- {title.strip()}")
-            if len(lines) >= limit:
+        title, url, score = m.group(1), m.group(2), m.group(3).strip()
+        i += 1
+        blurb_parts: list[str] = []
+        while i < len(lines):
+            raw = lines[i].strip()
+            if raw.startswith("## ") or raw == "---":
                 break
-    return lines
+            if (
+                not raw
+                or raw.startswith("<")
+                or raw.startswith("**背景")
+                or raw.startswith("**社区")
+                or raw.startswith("**标签")
+                or raw.startswith("hackernews")
+                or raw.startswith("rss ")
+                or " · " in raw and ("Jul " in raw or "Jun " in raw or "May " in raw)
+            ):
+                i += 1
+                if blurb_parts and (
+                    raw.startswith("**背景")
+                    or raw.startswith("hackernews")
+                    or (raw and " · " in raw)
+                ):
+                    break
+                continue
+            blurb_parts.append(raw)
+            if sum(len(p) for p in blurb_parts) >= 200:
+                break
+            i += 1
+        items.append(
+            {
+                "title": title,
+                "url": url,
+                "score": score,
+                "blurb": _clip(" ".join(blurb_parts), 320),
+            }
+        )
+    return items
 
+
+def extract_trending_items(path: Path, limit: int = 5) -> tuple[str, list[dict[str, str]]]:
+    """Theme + repo + description + tip for each trending entry."""
+    theme = ""
+    items: list[dict[str, str]] = []
+    lines = path.read_text(encoding="utf-8").splitlines()
+    i = 0
+    while i < len(lines):
+        tm = THEME_RE.match(lines[i].strip())
+        if tm:
+            theme = tm.group(1).strip()
+        m = TREND_HEAD_RE.match(lines[i].strip())
+        if m and len(items) < limit:
+            repo, url = m.group(1), m.group(2)
+            i += 1
+            desc = ""
+            tip = ""
+            while i < len(lines):
+                raw = lines[i].strip()
+                if raw.startswith("### "):
+                    break
+                if raw.startswith("> 💡") or raw.startswith(">💡"):
+                    tip = raw.lstrip("> ").lstrip("💡").strip()
+                elif raw and not raw.startswith("#") and not desc:
+                    desc = raw
+                i += 1
+            items.append(
+                {
+                    "repo": repo,
+                    "url": url,
+                    "desc": _clip(desc, 220),
+                    "tip": tip,
+                }
+            )
+            continue
+        i += 1
+    return theme, items
 
 def _send_netease_imap_id(mail: imaplib.IMAP4, host: str) -> None:
     """163/126 require IMAP ID before SELECT, else 'Unsafe Login'."""
@@ -161,45 +233,82 @@ def filter_inbox(
     return filtered
 
 
+def ruby_greeting(today: str, report_date: str | None, filtered_n: int) -> list[str]:
+    """Lightweight Ruby voice — soft secretary, not full chat immersion."""
+    when = report_date or "最近"
+    return [
+        f"主人～ Ruby 来交三天一份的功课啦（{today}）。",
+        "",
+        f"人家把 {when} 那期 Horizon 翻了一遍，挑了要点贴在下面；"
+        f"黑名单自动清掉了 {filtered_n} 封烦人的信。"
+        "想听更细的、或者要人家动手处理邮件/待办，随时叫 Ruby 就好～",
+        "",
+        "—— 推了推金丝眼镜，开始正式汇报 ——",
+        "",
+    ]
+
+
 def build_body(
     zh: Path | None,
     trending: Path | None,
     filtered: list[dict[str, str]],
 ) -> str:
     today = date.today().isoformat()
-    parts = [
-        f"你好，这是 Horizon 三天简报（{today}）。",
-        "",
-    ]
-
+    report_date = None
     if zh:
         m = DATE_RE.match(zh.name)
-        report_date = m.group(1) if m else zh.name
-        parts.append(f"## 日报要点（{report_date}）")
-        toc = extract_toc(zh)
-        parts.extend(toc if toc else ["（未能从日报提取目录）"])
-        parts.append("")
+        report_date = m.group(1) if m else None
+
+    parts = ruby_greeting(today, report_date, len(filtered))
+
+    if zh:
+        parts.append(f"【日报要点 · {report_date}】")
+        items = extract_zh_items(zh)
+        if not items:
+            parts.append("哎～这篇日报拆不开条目，主人要不要自己翻仓库里的 md……")
+        for idx, it in enumerate(items, 1):
+            score = f" {it['score']}" if it["score"] else ""
+            parts.append(f"{idx}. {it['title']}{score}")
+            if it["blurb"]:
+                parts.append(f"   {it['blurb']}")
+            parts.append(f"   链接：{it['url']}")
+            parts.append("")
     else:
-        parts.append("## 日报要点")
-        parts.append("本期没有新的中文日报。")
+        parts.append("【日报要点】")
+        parts.append("本期没有新的中文日报哦～ 可能 Actions 这轮没写出东西。")
         parts.append("")
 
     if trending:
-        parts.append("## GitHub Trending")
-        tops = extract_trending_top(trending)
-        parts.extend(tops if tops else ["（未能提取 trending 条目）"])
-        parts.append("")
+        theme, items = extract_trending_items(trending)
+        head = "【GitHub Trending】"
+        if theme:
+            head += f" 主题：{theme}"
+        parts.append(head)
+        if not items:
+            parts.append("trending 文件在，但人家没拆出仓库条目……")
+        for idx, it in enumerate(items, 1):
+            tip = f"（{it['tip']}）" if it["tip"] else ""
+            parts.append(f"{idx}. {it['repo']}{tip}")
+            if it["desc"]:
+                parts.append(f"   {it['desc']}")
+            parts.append(f"   {it['url']}")
+            parts.append("")
+        if not items:
+            parts.append("")
 
-    parts.append("## 邮件自动过滤")
-    parts.append(f"本期按黑名单标已读：{len(filtered)} 封。")
-    for item in filtered[:20]:
-        parts.append(f"- {item['sender']} — {item['subject']}")
-    if len(filtered) > 20:
-        parts.append(f"- …另有 {len(filtered) - 20} 封")
+    parts.append("【邮件自动过滤】")
+    if filtered:
+        parts.append(f"嘿嘿，又替主人挡掉 {len(filtered)} 封：")
+        for item in filtered[:20]:
+            parts.append(f"- {item['sender']} — {item['subject']}")
+        if len(filtered) > 20:
+            parts.append(f"- …另有 {len(filtered) - 20} 封，懒得全念了")
+    else:
+        parts.append("这轮黑名单没撞上什么，收件箱还算干净呢。")
     parts.append("")
-    parts.append("详情见仓库 data/summaries/。需要操作邮件或待办时再叫 Ruby。")
+    parts.append("汇报完毕～ 主人忙完记得回人家一句嘛。")
+    parts.append("（完整原文在仓库 data/summaries/）")
     return "\n".join(parts)
-
 
 def send_digest(
     smtp_host: str,
@@ -229,7 +338,7 @@ def main() -> None:
     smtp_port = int(os.environ.get("SMTP_PORT", "465"))
     imap_host = os.environ.get("IMAP_SERVER", default_imap)
     imap_port = int(os.environ.get("IMAP_PORT", "993"))
-    sender_name = os.environ.get("DIGEST_SENDER_NAME", "Horizon Digest")
+    sender_name = os.environ.get("DIGEST_SENDER_NAME", "Ruby")
     print(f"using smtp={smtp_host} imap={imap_host}")
 
     blocked = load_blocked()
@@ -239,7 +348,7 @@ def main() -> None:
     zh = latest_summary("zh")
     trending = latest_summary("trending")
     body = build_body(zh, trending, filtered)
-    subject = f"Horizon 简报 {date.today().isoformat()}（过滤 {len(filtered)}）"
+    subject = f"Ruby 简报 {date.today().isoformat()}（过滤 {len(filtered)}）"
     send_digest(
         smtp_host,
         smtp_port,
