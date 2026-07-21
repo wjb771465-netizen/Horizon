@@ -234,25 +234,24 @@ def filter_inbox(
     return filtered
 
 
-def llm_enrich(
+def _has_cjk(text: str) -> bool:
+    return sum(1 for c in text if "\u4e00" <= c <= "\u9fff") >= 2
+
+
+def llm_greeting(
     zh_items: list[dict[str, str]],
     theme: str,
     trend_items: list[dict[str, str]],
     filtered_n: int,
     report_date: str | None,
-) -> dict:
-    """Ask SiliconFlow for Ruby greeting + Chinese trending blurbs.
-
-    Returns dict with keys: greeting (str), theme_zh (str), trending (list).
-    """
+) -> str:
+    """Generate Ruby-persona greeting that summarizes this digest."""
     api_key = os.environ.get("SILICONFLOW_API_KEY", "").strip()
     if not api_key:
         raise SystemExit("missing required env: SILICONFLOW_API_KEY")
 
     base = os.environ.get("DIGEST_LLM_BASE", "https://api.siliconflow.cn/v1").rstrip("/")
-    model = os.environ.get(
-        "DIGEST_LLM_MODEL", "deepseek-ai/DeepSeek-V4-Flash"
-    )
+    model = os.environ.get("DIGEST_LLM_MODEL", "deepseek-ai/DeepSeek-V3.2")
 
     brief = {
         "date": report_date or date.today().isoformat(),
@@ -261,7 +260,7 @@ def llm_enrich(
             {
                 "title": it["title"],
                 "score": it.get("score", ""),
-                "blurb": _clip(it.get("blurb", ""), 160),
+                "blurb": _clip(it.get("blurb", ""), 120),
             }
             for it in zh_items
         ],
@@ -269,7 +268,7 @@ def llm_enrich(
         "trending": [
             {
                 "repo": it["repo"],
-                "desc": _clip(it.get("desc", ""), 120),
+                "desc": _clip(it.get("desc", ""), 80),
                 "tip": it.get("tip", ""),
             }
             for it in trend_items
@@ -281,23 +280,20 @@ def llm_enrich(
         "语气软糯粘人，自称「人家」，称呼对方「主人」或「BOSS」，句尾可带～呢呀…"
         "可以轻轻推眼镜、撒娇抱怨一两句，但保持秘书汇报体面，不要露骨色情描写。"
         "绝对不要说自己是 AI 或程序。"
-        "你只输出一个 JSON 对象，不要 markdown 代码围栏，不要其它解释。"
+        "只输出问候正文纯文本，不要 JSON，不要 markdown 标题。"
     )
     user = (
-        "根据下面的简报素材，生成邮件开头问候，并把 GitHub trending 全部改写成中文。\n"
-        "JSON 字段要求：\n"
-        '- "greeting": 字符串，3～6 句。先简要问候，再概括本期日报/热门里最值得主人知道的一两件事，'
-        "顺带提一句黑名单过滤了几封；软秘书口吻，不要罗列全部标题。\n"
-        '- "theme_zh": 今日 trending 主题的中文（若原文已是中文可润色保留）。\n'
-        '- "trending": 数组，与输入仓库一一对应，每项 '
-        '{"repo":"原样保留","summary_zh":"一两句中文简介","tip_zh":"短中文标签"}。\n\n'
+        "根据素材写一封邮件开头问候（3～6 句）：先打招呼，再概括本期日报/GitHub 热门里"
+        "最值得主人知道的一两件事，并提一句黑名单过滤了几封。"
+        "不要罗列全部标题，后面正文另有明细。\n\n"
         f"素材：\n{json.dumps(brief, ensure_ascii=False)}"
     )
 
     payload = {
         "model": model,
         "temperature": 0.7,
-        "max_tokens": 1600,
+        "max_tokens": 600,
+        "enable_thinking": False,
         "messages": [
             {"role": "system", "content": system},
             {"role": "user", "content": user},
@@ -320,17 +316,13 @@ def llm_enrich(
             with urllib.request.urlopen(req, timeout=timeout) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
             content = data["choices"][0]["message"]["content"].strip()
-            if content.startswith("```"):
-                content = re.sub(r"^```(?:json)?\s*", "", content)
-                content = re.sub(r"\s*```$", "", content)
-            parsed = json.loads(content)
-            if "greeting" not in parsed or "trending" not in parsed:
-                raise RuntimeError(f"LLM JSON missing fields: {parsed.keys()}")
-            return parsed
+            if not content:
+                raise RuntimeError("empty LLM greeting")
+            return content
         except Exception as e:
             last_err = e
             print(f"llm attempt {attempt + 1} failed: {e}", flush=True)
-    raise RuntimeError(f"LLM enrich failed: {last_err}")
+    raise RuntimeError(f"LLM greeting failed: {last_err}")
 
 
 def build_body(
@@ -338,7 +330,6 @@ def build_body(
     trending: Path | None,
     filtered: list[dict[str, str]],
 ) -> str:
-    today = date.today().isoformat()
     report_date = None
     if zh:
         m = DATE_RE.match(zh.name)
@@ -347,15 +338,7 @@ def build_body(
     zh_items = extract_zh_items(zh) if zh else []
     theme, trend_items = extract_trending_items(trending) if trending else ("", [])
 
-    enrich = llm_enrich(zh_items, theme, trend_items, len(filtered), report_date)
-    greeting = str(enrich["greeting"]).strip()
-    theme_zh = str(enrich.get("theme_zh") or theme or "").strip()
-    trend_zh = {
-        str(t.get("repo", "")): t
-        for t in enrich.get("trending", [])
-        if isinstance(t, dict)
-    }
-
+    greeting = llm_greeting(zh_items, theme, trend_items, len(filtered), report_date)
     parts = [greeting, "", "—— 好啦，下面是条目明细 ——", ""]
 
     if zh:
@@ -376,19 +359,22 @@ def build_body(
 
     if trending:
         head = "【GitHub 热门】"
-        if theme_zh:
-            head += f" 主题：{theme_zh}"
+        if theme:
+            head += f" 主题：{theme}"
         parts.append(head)
         if not trend_items:
             parts.append("trending 文件在，但人家没拆出仓库条目……")
         for idx, it in enumerate(trend_items, 1):
-            zh_row = trend_zh.get(it["repo"], {})
-            tip = zh_row.get("tip_zh") or it.get("tip") or ""
-            summary = zh_row.get("summary_zh") or it.get("desc") or ""
+            tip = it.get("tip") or ""
+            # Prefer Chinese desc from horizon-trending; skip leftover English-only blurbs.
+            desc = it.get("desc") or ""
+            summary = desc if _has_cjk(desc) else ""
             tip_s = f"（{tip}）" if tip else ""
             parts.append(f"{idx}. {it['repo']}{tip_s}")
             if summary:
                 parts.append(f"   {summary}")
+            elif tip:
+                pass  # tip already on the title line
             parts.append(f"   {it['url']}")
             parts.append("")
         if not trend_items:

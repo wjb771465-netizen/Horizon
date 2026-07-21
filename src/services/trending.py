@@ -45,7 +45,7 @@ SYSTEM_PROMPT = """你是一个技术新闻编辑，擅长从 GitHub 热门仓�
       "rank": 1,
       "name": "owner/repo（必须填写，从列表中复制完整仓库名）",
       "url": "https://github.com/owner/repo",
-      "desc": "原始英文描述，不要翻译",
+      "desc": "中文简介（一两句，不要英文原文）",
       "reason": "中文推荐理由（20字以内）"
     }
   ]
