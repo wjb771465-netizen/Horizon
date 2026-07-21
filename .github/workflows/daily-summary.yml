@@ -49,3 +49,10 @@ jobs:
             git commit -m "chore: daily report $(date +'%Y-%m-%d')"
             git push
           fi
+
+      - name: Filter inbox and send digest
+        env:
+          EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
+          DIGEST_FROM: ${{ secrets.DIGEST_FROM }}
+          DIGEST_TO: ${{ secrets.DIGEST_TO }}
+        run: python3 scripts/digest_mail.py

@@ -1,0 +1,10 @@
+{
+  "blocked_senders": [
+    "insideapple.apple.com",
+    "no-reply@email.claude.com",
+    "noreply@email.openai.com",
+    "hello@updates.requesty.ai",
+    "notify@mail.trae.ai",
+    "messages-noreply@linkedin.com"
+  ]
+}
