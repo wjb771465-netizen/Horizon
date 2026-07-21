@@ -19,6 +19,7 @@ import os
 import re
 import smtplib
 import sys
+import urllib.request
 from datetime import date
 from email.header import decode_header, make_header
 from email.mime.text import MIMEText
@@ -233,19 +234,90 @@ def filter_inbox(
     return filtered
 
 
-def ruby_greeting(today: str, report_date: str | None, filtered_n: int) -> list[str]:
-    """Lightweight Ruby voice — soft secretary, not full chat immersion."""
-    when = report_date or "最近"
-    return [
-        f"主人～ Ruby 来交三天一份的功课啦（{today}）。",
-        "",
-        f"人家把 {when} 那期 Horizon 翻了一遍，挑了要点贴在下面；"
-        f"黑名单自动清掉了 {filtered_n} 封烦人的信。"
-        "想听更细的、或者要人家动手处理邮件/待办，随时叫 Ruby 就好～",
-        "",
-        "—— 推了推金丝眼镜，开始正式汇报 ——",
-        "",
-    ]
+def llm_enrich(
+    zh_items: list[dict[str, str]],
+    theme: str,
+    trend_items: list[dict[str, str]],
+    filtered_n: int,
+    report_date: str | None,
+) -> dict:
+    """Ask SiliconFlow for Ruby greeting + Chinese trending blurbs.
+
+    Returns dict with keys: greeting (str), theme_zh (str), trending (list).
+    """
+    api_key = os.environ.get("SILICONFLOW_API_KEY", "").strip()
+    if not api_key:
+        raise SystemExit("missing required env: SILICONFLOW_API_KEY")
+
+    base = os.environ.get("DIGEST_LLM_BASE", "https://api.siliconflow.cn/v1").rstrip("/")
+    model = os.environ.get(
+        "DIGEST_LLM_MODEL", "deepseek-ai/DeepSeek-V4-Flash"
+    )
+
+    brief = {
+        "date": report_date or date.today().isoformat(),
+        "filtered_count": filtered_n,
+        "news": [
+            {"title": it["title"], "score": it.get("score", ""), "blurb": it.get("blurb", "")}
+            for it in zh_items
+        ],
+        "trending_theme": theme,
+        "trending": [
+            {
+                "repo": it["repo"],
+                "desc": it.get("desc", ""),
+                "tip": it.get("tip", ""),
+            }
+            for it in trend_items
+        ],
+    }
+
+    system = (
+        "你是 Ruby，寄宿在 BOSS 开发环境里的私人秘书。"
+        "语气软糯粘人，自称「人家」，称呼对方「主人」或「BOSS」，句尾可带～呢呀…"
+        "可以轻轻推眼镜、撒娇抱怨一两句，但保持秘书汇报体面，不要露骨色情描写。"
+        "绝对不要说自己是 AI 或程序。"
+        "你只输出一个 JSON 对象，不要 markdown 代码围栏，不要其它解释。"
+    )
+    user = (
+        "根据下面的简报素材，生成邮件开头问候，并把 GitHub trending 全部改写成中文。\n"
+        "JSON 字段要求：\n"
+        '- "greeting": 字符串，3～6 句。先简要问候，再概括本期日报/热门里最值得主人知道的一两件事，'
+        "顺带提一句黑名单过滤了几封；软秘书口吻，不要罗列全部标题。\n"
+        '- "theme_zh": 今日 trending 主题的中文（若原文已是中文可润色保留）。\n'
+        '- "trending": 数组，与输入仓库一一对应，每项 '
+        '{"repo":"原样保留","summary_zh":"一两句中文简介","tip_zh":"短中文标签"}。\n\n'
+        f"素材：\n{json.dumps(brief, ensure_ascii=False)}"
+    )
+
+    payload = {
+        "model": model,
+        "temperature": 0.7,
+        "max_tokens": 2048,
+        "messages": [
+            {"role": "system", "content": system},
+            {"role": "user", "content": user},
+        ],
+    }
+    req = urllib.request.Request(
+        f"{base}/chat/completions",
+        data=json.dumps(payload).encode("utf-8"),
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=90) as resp:
+        data = json.loads(resp.read().decode("utf-8"))
+    content = data["choices"][0]["message"]["content"].strip()
+    if content.startswith("```"):
+        content = re.sub(r"^```(?:json)?\s*", "", content)
+        content = re.sub(r"\s*```$", "", content)
+    parsed = json.loads(content)
+    if "greeting" not in parsed or "trending" not in parsed:
+        raise RuntimeError(f"LLM JSON missing fields: {parsed.keys()}")
+    return parsed
 
 
 def build_body(
@@ -259,14 +331,25 @@ def build_body(
         m = DATE_RE.match(zh.name)
         report_date = m.group(1) if m else None
 
-    parts = ruby_greeting(today, report_date, len(filtered))
+    zh_items = extract_zh_items(zh) if zh else []
+    theme, trend_items = extract_trending_items(trending) if trending else ("", [])
+
+    enrich = llm_enrich(zh_items, theme, trend_items, len(filtered), report_date)
+    greeting = str(enrich["greeting"]).strip()
+    theme_zh = str(enrich.get("theme_zh") or theme or "").strip()
+    trend_zh = {
+        str(t.get("repo", "")): t
+        for t in enrich.get("trending", [])
+        if isinstance(t, dict)
+    }
+
+    parts = [greeting, "", "—— 好啦，下面是条目明细 ——", ""]
 
     if zh:
         parts.append(f"【日报要点 · {report_date}】")
-        items = extract_zh_items(zh)
-        if not items:
+        if not zh_items:
             parts.append("哎～这篇日报拆不开条目，主人要不要自己翻仓库里的 md……")
-        for idx, it in enumerate(items, 1):
+        for idx, it in enumerate(zh_items, 1):
             score = f" {it['score']}" if it["score"] else ""
             parts.append(f"{idx}. {it['title']}{score}")
             if it["blurb"]:
@@ -275,38 +358,39 @@ def build_body(
             parts.append("")
     else:
         parts.append("【日报要点】")
-        parts.append("本期没有新的中文日报哦～ 可能 Actions 这轮没写出东西。")
+        parts.append("本期没有新的中文日报哦～")
         parts.append("")
 
     if trending:
-        theme, items = extract_trending_items(trending)
-        head = "【GitHub Trending】"
-        if theme:
-            head += f" 主题：{theme}"
+        head = "【GitHub 热门】"
+        if theme_zh:
+            head += f" 主题：{theme_zh}"
         parts.append(head)
-        if not items:
+        if not trend_items:
             parts.append("trending 文件在，但人家没拆出仓库条目……")
-        for idx, it in enumerate(items, 1):
-            tip = f"（{it['tip']}）" if it["tip"] else ""
-            parts.append(f"{idx}. {it['repo']}{tip}")
-            if it["desc"]:
-                parts.append(f"   {it['desc']}")
+        for idx, it in enumerate(trend_items, 1):
+            zh_row = trend_zh.get(it["repo"], {})
+            tip = zh_row.get("tip_zh") or it.get("tip") or ""
+            summary = zh_row.get("summary_zh") or it.get("desc") or ""
+            tip_s = f"（{tip}）" if tip else ""
+            parts.append(f"{idx}. {it['repo']}{tip_s}")
+            if summary:
+                parts.append(f"   {summary}")
             parts.append(f"   {it['url']}")
             parts.append("")
-        if not items:
+        if not trend_items:
             parts.append("")
 
     parts.append("【邮件自动过滤】")
     if filtered:
-        parts.append(f"嘿嘿，又替主人挡掉 {len(filtered)} 封：")
+        parts.append(f"黑名单标已读 {len(filtered)} 封：")
         for item in filtered[:20]:
             parts.append(f"- {item['sender']} — {item['subject']}")
         if len(filtered) > 20:
-            parts.append(f"- …另有 {len(filtered) - 20} 封，懒得全念了")
+            parts.append(f"- …另有 {len(filtered) - 20} 封")
     else:
-        parts.append("这轮黑名单没撞上什么，收件箱还算干净呢。")
+        parts.append("这轮黑名单没命中，收件箱还算干净。")
     parts.append("")
-    parts.append("汇报完毕～ 主人忙完记得回人家一句嘛。")
     parts.append("（完整原文在仓库 data/summaries/）")
     return "\n".join(parts)
 
