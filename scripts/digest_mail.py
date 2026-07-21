@@ -258,14 +258,18 @@ def llm_enrich(
         "date": report_date or date.today().isoformat(),
         "filtered_count": filtered_n,
         "news": [
-            {"title": it["title"], "score": it.get("score", ""), "blurb": it.get("blurb", "")}
+            {
+                "title": it["title"],
+                "score": it.get("score", ""),
+                "blurb": _clip(it.get("blurb", ""), 160),
+            }
             for it in zh_items
         ],
         "trending_theme": theme,
         "trending": [
             {
                 "repo": it["repo"],
-                "desc": it.get("desc", ""),
+                "desc": _clip(it.get("desc", ""), 120),
                 "tip": it.get("tip", ""),
             }
             for it in trend_items
@@ -293,31 +297,40 @@ def llm_enrich(
     payload = {
         "model": model,
         "temperature": 0.7,
-        "max_tokens": 2048,
+        "max_tokens": 1600,
         "messages": [
             {"role": "system", "content": system},
             {"role": "user", "content": user},
         ],
     }
-    req = urllib.request.Request(
-        f"{base}/chat/completions",
-        data=json.dumps(payload).encode("utf-8"),
-        headers={
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-        },
-        method="POST",
-    )
-    with urllib.request.urlopen(req, timeout=90) as resp:
-        data = json.loads(resp.read().decode("utf-8"))
-    content = data["choices"][0]["message"]["content"].strip()
-    if content.startswith("```"):
-        content = re.sub(r"^```(?:json)?\s*", "", content)
-        content = re.sub(r"\s*```$", "", content)
-    parsed = json.loads(content)
-    if "greeting" not in parsed or "trending" not in parsed:
-        raise RuntimeError(f"LLM JSON missing fields: {parsed.keys()}")
-    return parsed
+    body = json.dumps(payload).encode("utf-8")
+    timeout = int(os.environ.get("DIGEST_LLM_TIMEOUT", "180"))
+    last_err: Exception | None = None
+    for attempt in range(2):
+        try:
+            req = urllib.request.Request(
+                f"{base}/chat/completions",
+                data=body,
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                },
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+            content = data["choices"][0]["message"]["content"].strip()
+            if content.startswith("```"):
+                content = re.sub(r"^```(?:json)?\s*", "", content)
+                content = re.sub(r"\s*```$", "", content)
+            parsed = json.loads(content)
+            if "greeting" not in parsed or "trending" not in parsed:
+                raise RuntimeError(f"LLM JSON missing fields: {parsed.keys()}")
+            return parsed
+        except Exception as e:
+            last_err = e
+            print(f"llm attempt {attempt + 1} failed: {e}", flush=True)
+    raise RuntimeError(f"LLM enrich failed: {last_err}")
 
 
 def build_body(
