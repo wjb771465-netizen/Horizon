@@ -1,6 +1,8 @@
-name: Digest mail only
+name: Digest mail
 
 on:
+  schedule:
+    - cron: '0 22 * * *'  # Every day at 06:00 UTC+8
   workflow_dispatch:
 
 jobs:

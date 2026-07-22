@@ -17,7 +17,7 @@ AI 驱动的信息聚合系统——从多源抓取内容、AI 打分筛选、�
 | `src/setup/` | 交互式配置向导 |
 | `scripts/` | 辅助脚本：daily-run.sh（cron）、github_trending.py（原型） |
 | `data/` | 运行时数据：config.json、presets.json、summaries/ |
-| `.github/workflows/` | GitHub Actions：每 3 天定时跑 horizon + trending，产物 commit 到 `data/summaries/` |
+| `.github/workflows/` | GitHub Actions：每 3 天跑 horizon + trending 并 commit `data/summaries/`；每天跑 `digest_mail`（IMAP 过滤 + 简报） |
 | `docs/` | Jekyll GitHub Pages 文档站点 |
 | `tests/` | pytest 测试套件 |
 
