@@ -10,10 +10,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - name: Filter inbox and send digest
+      - name: Filter inbox (silent)
         env:
           EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
           DIGEST_FROM: ${{ secrets.DIGEST_FROM }}
-          DIGEST_TO: ${{ secrets.DIGEST_TO }}
-          SILICONFLOW_API_KEY: ${{ secrets.SILICONFLOW_API_KEY }}
-        run: python3 scripts/digest_mail.py
+        run: python3 scripts/digest_mail.py --filter-only

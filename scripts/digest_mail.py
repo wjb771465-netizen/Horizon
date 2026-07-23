@@ -1,17 +1,25 @@
 #!/usr/bin/env python3
 """Cloud digest: IMAP blacklist filter + SMTP briefing email.
 
-Env (required):
-  EMAIL_PASSWORD, DIGEST_FROM, DIGEST_TO
+Always filters the inbox. Sends a briefing email only when there is a
+Chinese summary dated today (UTC on GitHub runners). Use --filter-only
+to skip sending entirely (daily silent filter).
+
+Env (required for filter):
+  EMAIL_PASSWORD, DIGEST_FROM
+
+Env (required for send):
+  DIGEST_TO, SILICONFLOW_API_KEY
 
 Env (optional):
-  SMTP_SERVER (default smtp.qq.com), SMTP_PORT (465)
-  IMAP_SERVER (default imap.qq.com), IMAP_PORT (993)
-  DIGEST_SENDER_NAME (default Horizon Digest)
+  SMTP_SERVER / IMAP_SERVER (inferred from DIGEST_FROM domain)
+  SMTP_PORT (465), IMAP_PORT (993)
+  DIGEST_SENDER_NAME (default Ruby)
 """
 
 from __future__ import annotations
 
+import argparse
 import email as email_lib
 import imaplib
 import json
@@ -412,10 +420,24 @@ def send_digest(
         server.send_message(msg)
 
 
-def main() -> None:
+def _summary_date(path: Path | None) -> str | None:
+    if not path:
+        return None
+    m = DATE_RE.match(path.name)
+    return m.group(1) if m else None
+
+
+def main(argv: list[str] | None = None) -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--filter-only",
+        action="store_true",
+        help="Only mark blocked senders as read; never send email",
+    )
+    args = parser.parse_args(argv)
+
     password = _require("EMAIL_PASSWORD")
     from_addr = _require("DIGEST_FROM")
-    to_addr = _require("DIGEST_TO")
     default_smtp, default_imap = hosts_for_address(from_addr)
     smtp_host = os.environ.get("SMTP_SERVER", default_smtp)
     smtp_port = int(os.environ.get("SMTP_PORT", "465"))
@@ -428,10 +450,20 @@ def main() -> None:
     filtered = filter_inbox(imap_host, imap_port, from_addr, password, blocked)
     print(f"filtered {len(filtered)} messages")
 
+    if args.filter_only:
+        return
+
     zh = latest_summary("zh")
+    report_date = _summary_date(zh)
+    today = date.today().isoformat()
+    if report_date != today:
+        print(f"no publication for {today} (latest={report_date}), skip send")
+        return
+
+    to_addr = _require("DIGEST_TO")
     trending = latest_summary("trending")
     body = build_body(zh, trending, filtered)
-    subject = f"Ruby 简报 {date.today().isoformat()}（过滤 {len(filtered)}）"
+    subject = f"Ruby 简报 {today}（过滤 {len(filtered)}）"
     send_digest(
         smtp_host,
         smtp_port,
