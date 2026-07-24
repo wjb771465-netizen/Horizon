@@ -254,6 +254,36 @@ Minimal manual configuration:
 }
 ```
 
+**Balanced digest (optional)**
+
+Limit the final digest size and prevent one category from dominating the
+results. Categories come from source configuration such as
+`sources.rss[].category`.
+
+```jsonc
+{
+  "filtering": {
+    "ai_score_threshold": 6.0,
+    "max_items": 20,
+    "category_groups": {
+      "ai": {
+        "limit": 5,
+        "categories": ["ai-news", "ai-tools", "machine-learning"]
+      },
+      "finance": {
+        "limit": 5,
+        "categories": ["finance", "business", "equities"]
+      }
+    },
+    "default_group": "other",
+    "default_group_limit": 3
+  }
+}
+```
+
+Group limits are applied after AI score filtering and before enrichment. If
+`category_groups` and `max_items` are omitted, filtering behaves as before.
+
 Any string value in `data/config.json` can reference environment variables with `${VAR_NAME}`. This is useful for values such as `ai.base_url`, private RSS feed URLs, webhook endpoints, or custom header templates.
 
 For the full reference, see the [Configuration Guide](docs/configuration.md).
@@ -312,6 +342,7 @@ For setup details, see the [Configuration Guide](docs/configuration.md). For MCP
 | [Configuration](docs/configuration.md) | AI providers, sources, filtering, email, webhook, GitHub Pages, and MCP setup |
 | [Scoring](docs/scoring.md) | How Horizon evaluates and ranks news items |
 | [Scrapers](docs/scrapers.md) | Source scraper details and extension notes |
+| [Extractors](docs/extractors.md) | Full article extraction for RSS sources |
 | [MCP Tools](src/mcp/README.md) | Tool reference for MCP-compatible clients |
 
 ## Project Status

@@ -2,7 +2,7 @@
 
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Optional, List, Dict, Any, Union
+from typing import Annotated, Literal, Optional, List, Dict, Any, Union
 from pydantic import BaseModel, HttpUrl, Field, field_validator
 
 
@@ -17,6 +17,8 @@ class SourceType(str, Enum):
     TWITTER = "twitter"
     OPENBB = "openbb"
     OSSINSIGHT = "ossinsight"
+    GDELT = "gdelt"
+    GOOGLE_NEWS = "google_news"
 
 
 class ContentItem(BaseModel):
@@ -83,6 +85,7 @@ class GitHubSourceConfig(BaseModel):
     owner: Optional[str] = None
     repo: Optional[str] = None
     enabled: bool = True
+    category: Optional[str] = None
 
 
 class HackerNewsConfig(BaseModel):
@@ -91,6 +94,23 @@ class HackerNewsConfig(BaseModel):
     enabled: bool = True
     fetch_top_stories: int = 30
     min_score: int = 100
+    category: Optional[str] = None
+
+
+class ExtractorType(str, Enum):
+    TRAFILATURA = "trafilatura"
+
+
+class TrafilaturaExtractorConfig(BaseModel):
+    type: Literal[ExtractorType.TRAFILATURA] = ExtractorType.TRAFILATURA
+    favor_precision: bool = False
+    favor_recall: bool = False
+
+
+ExtractorConfig = Annotated[
+    Union[TrafilaturaExtractorConfig],
+    Field(discriminator="type"),
+]
 
 
 class RSSSourceConfig(BaseModel):
@@ -100,6 +120,7 @@ class RSSSourceConfig(BaseModel):
     url: HttpUrl
     enabled: bool = True
     category: Optional[str] = None
+    content_extractor: Optional[str] = None
 
 
 class RedditSubredditConfig(BaseModel):
@@ -113,6 +134,7 @@ class RedditSubredditConfig(BaseModel):
     )
     fetch_limit: int = 25
     min_score: int = 10
+    category: Optional[str] = None
 
 
 class RedditUserConfig(BaseModel):
@@ -122,6 +144,7 @@ class RedditUserConfig(BaseModel):
     enabled: bool = True
     sort: str = "new"
     fetch_limit: int = 10
+    category: Optional[str] = None
 
 
 class RedditConfig(BaseModel):
@@ -139,6 +162,7 @@ class TelegramChannelConfig(BaseModel):
     channel: str  # channel username, e.g. "zaihuapd"
     enabled: bool = True
     fetch_limit: int = 20
+    category: Optional[str] = None
 
 
 class TelegramConfig(BaseModel):
@@ -156,6 +180,7 @@ class TwitterConfig(BaseModel):
     actor_id: str = "altimis~scweet"
     users: List[str] = Field(default_factory=list)
     fetch_limit: int = 10
+    category: Optional[str] = None
     fetch_reply_text: bool = False
     max_replies_per_tweet: int = 3
     max_tweets_to_expand: int = 10
@@ -214,6 +239,44 @@ class OSSInsightConfig(BaseModel):
     keywords: List[str] = Field(default_factory=list)
     min_stars: int = 5
     max_items: int = 30
+    category: Optional[str] = None
+
+
+class GDELTConfig(BaseModel):
+    """GDELT 2.0 DOC API source configuration.
+
+    Queries the key-less GDELT DOC API
+    (https://api.gdeltproject.org/api/v2/doc/doc) for recent news articles
+    matching a search query and emits them as ContentItems. No API key is
+    required. The DOC API caps results at 250 records per request, so keep
+    `max_records` modest.
+    """
+
+    enabled: bool = False
+    query: str = "artificial intelligence"
+    mode: str = "ArtList"
+    max_records: int = 75  # GDELT DOC API caps at 250; keep modest
+    timespan: Optional[str] = None  # e.g. "24h"; overrides since-derived window
+    language: Optional[str] = None  # sourcelang filter, e.g. "english"; None = no filter
+    country: Optional[str] = None  # sourcecountry filter; None = no filter
+    category: Optional[str] = None  # Horizon category label for downstream grouping
+
+
+class GoogleNewsConfig(BaseModel):
+    """Google News RSS search source configuration.
+
+    Builds Google News RSS search URLs
+    (https://news.google.com/rss/search) for a query and parses the
+    resulting feed via feedparser. No API key is required.
+    """
+
+    enabled: bool = False
+    query: str = "artificial intelligence"
+    language: str = "en"  # hl
+    country: str = "US"  # gl
+    ceid: Optional[str] = None  # when None scraper derives it as "{country}:{language}"
+    max_results: int = 100  # cap ~100
+    category: Optional[str] = None
 
 
 class SourcesConfig(BaseModel):
@@ -227,6 +290,8 @@ class SourcesConfig(BaseModel):
     twitter: Optional[TwitterConfig] = None
     openbb: Optional[OpenBBConfig] = None
     ossinsight: OSSInsightConfig = Field(default_factory=OSSInsightConfig)
+    gdelt: Optional[GDELTConfig] = None
+    google_news: Optional[GoogleNewsConfig] = None
 
 
 class WebhookConfig(BaseModel):
@@ -313,11 +378,23 @@ class EmailConfig(BaseModel):
     enabled: bool = False
 
 
+class CategoryGroupConfig(BaseModel):
+    """A quota group containing one or more source categories."""
+
+    name: Optional[str] = None
+    limit: int = Field(gt=0)
+    categories: List[str] = Field(min_length=1)
+
+
 class FilteringConfig(BaseModel):
     """Content filtering configuration."""
 
     ai_score_threshold: float = 7.0
     time_window_hours: int = 24
+    max_items: Optional[int] = Field(default=None, gt=0)
+    category_groups: Dict[str, CategoryGroupConfig] = Field(default_factory=dict)
+    default_group: str = "other"
+    default_group_limit: Optional[int] = Field(default=None, gt=0)
 
 
 class Config(BaseModel):
@@ -327,5 +404,6 @@ class Config(BaseModel):
     ai: AIConfig
     sources: SourcesConfig
     filtering: FilteringConfig
+    extractors: Dict[str, ExtractorConfig] = Field(default_factory=dict)
     email: Optional[EmailConfig] = None
     webhook: Optional[WebhookConfig] = None
