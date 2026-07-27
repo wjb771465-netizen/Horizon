@@ -160,7 +160,7 @@ class OpenAIClient(AIClient):
         fb_cfg = config.fallback
         if fb_cfg:
             fb_provider = AIProvider(fb_cfg.get("provider", "deepseek"))
-            fb_model = fb_cfg.get("model", "deepseek-chat")
+            fb_model = fb_cfg.get("model", "deepseek-v4-flash")
             fb_key_env = fb_cfg.get("api_key_env", "DEEPSEEK_API_KEY")
             fb_key = os.getenv(fb_key_env)
             if fb_key:
