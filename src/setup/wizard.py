@@ -511,8 +511,6 @@ def _count_sources(config: Config) -> int:
         count += len([s for s in config.sources.openbb.watchlists if s.enabled])
     if config.sources.ossinsight.enabled:
         count += 1
-    if config.sources.gdelt and config.sources.gdelt.enabled:
-        count += 1
-    if config.sources.google_news and config.sources.google_news.enabled:
-        count += 1
+    count += sum(1 for source in config.sources.gdelt if source.enabled)
+    count += sum(1 for source in config.sources.google_news if source.enabled)
     return count

@@ -39,8 +39,10 @@ SOURCE_REGISTRY = {
     SourceType.TWITTER.value: SourceDefinition("twitter", item_fields=("users",)),
     SourceType.OPENBB.value: SourceDefinition("openbb", item_fields=("watchlists",)),
     SourceType.OSSINSIGHT.value: SourceDefinition("ossinsight"),
-    SourceType.GDELT.value: SourceDefinition("gdelt"),
-    SourceType.GOOGLE_NEWS.value: SourceDefinition("google_news"),
+    SourceType.GDELT.value: SourceDefinition("gdelt", config_is_list=True),
+    SourceType.GOOGLE_NEWS.value: SourceDefinition(
+        "google_news", config_is_list=True
+    ),
 }
 
 ProfileRoute = Optional[Union[str, List[str]]]
@@ -436,6 +438,15 @@ class GoogleNewsConfig(BaseModel):
     profile: ProfileRoute = None
 
 
+def _coerce_source_list(value: object) -> object:
+    """Accept a legacy single object as a one-element list."""
+    if value is None:
+        return []
+    if isinstance(value, dict):
+        return [value]
+    return value
+
+
 class SourcesConfig(BaseModel):
     """All sources configuration."""
 
@@ -447,8 +458,13 @@ class SourcesConfig(BaseModel):
     twitter: Optional[TwitterConfig] = None
     openbb: Optional[OpenBBConfig] = None
     ossinsight: OSSInsightConfig = Field(default_factory=OSSInsightConfig)
-    gdelt: Optional[GDELTConfig] = None
-    google_news: Optional[GoogleNewsConfig] = None
+    gdelt: List[GDELTConfig] = Field(default_factory=list)
+    google_news: List[GoogleNewsConfig] = Field(default_factory=list)
+
+    @field_validator("gdelt", "google_news", mode="before")
+    @classmethod
+    def coerce_news_source_lists(cls, value: object) -> object:
+        return _coerce_source_list(value)
 
 
 class WebhookConfig(BaseModel):

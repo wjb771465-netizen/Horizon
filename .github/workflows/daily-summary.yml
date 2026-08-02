@@ -43,6 +43,10 @@ jobs:
         if: steps.gate.outputs.due == 'true'
         run: uv sync
 
+      - name: Prepare runtime config
+        if: steps.gate.outputs.due == 'true'
+        run: cp data/config.github.json data/config.json
+
       - name: Run Horizon
         if: steps.gate.outputs.due == 'true'
         env:

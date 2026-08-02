@@ -475,14 +475,20 @@ class HorizonOrchestrator:
                 tasks.append(self._fetch_with_progress("OSS Insight", oss_scraper, since))
 
             # GDELT 2.0 DOC API (key-less global news)
-            if self.config.sources.gdelt and self.config.sources.gdelt.enabled:
-                gdelt_scraper = GDELTScraper(self.config.sources.gdelt, client)
-                tasks.append(self._fetch_with_progress("GDELT", gdelt_scraper, since))
+            for gdelt_cfg in self.config.sources.gdelt:
+                if not gdelt_cfg.enabled:
+                    continue
+                label = f"GDELT ({gdelt_cfg.query})"
+                gdelt_scraper = GDELTScraper(gdelt_cfg, client)
+                tasks.append(self._fetch_with_progress(label, gdelt_scraper, since))
 
             # Google News RSS (key-less news search)
-            if self.config.sources.google_news and self.config.sources.google_news.enabled:
-                gn_scraper = GoogleNewsScraper(self.config.sources.google_news, client)
-                tasks.append(self._fetch_with_progress("Google News", gn_scraper, since))
+            for gn_cfg in self.config.sources.google_news:
+                if not gn_cfg.enabled:
+                    continue
+                label = f"Google News ({gn_cfg.query})"
+                gn_scraper = GoogleNewsScraper(gn_cfg, client)
+                tasks.append(self._fetch_with_progress(label, gn_scraper, since))
 
             # Fetch all concurrently
             outcomes = await asyncio.gather(*tasks)

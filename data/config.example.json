@@ -24,6 +24,10 @@
       "finance-news": {
         "threshold": 7.0,
         "topic_dedup": true
+      },
+      "world-news": {
+        "threshold": 7.0,
+        "topic_dedup": true
       }
     }
   },
@@ -78,6 +82,20 @@
         "category": "finance",
         "profile": "finance-news",
         "content_extractor": "trafilatura"
+      },
+      {
+        "name": "BBC World",
+        "url": "https://feeds.bbci.co.uk/news/world/rss.xml",
+        "enabled": true,
+        "category": "world",
+        "profile": "world-news"
+      },
+      {
+        "name": "Guardian World",
+        "url": "https://www.theguardian.com/world/rss",
+        "enabled": true,
+        "category": "world",
+        "profile": "world-news"
       },
       {
         "name": "NVIDIA CUDA Technical Blog",
@@ -165,41 +183,69 @@
         }
       ]
     },
-    "gdelt": {
-      "enabled": false,
-      "query": "artificial intelligence",
-      "mode": "ArtList",
-      "max_records": 75,
-      "timespan": null,
-      "language": null,
-      "country": null,
-      "category": "news",
-      "profile": "tech-news"
-    },
-    "google_news": {
-      "enabled": false,
-      "query": "artificial intelligence",
-      "language": "en",
-      "country": "US",
-      "ceid": null,
-      "max_results": 100,
-      "category": "news",
-      "profile": "tech-news"
-    }
+    "gdelt": [
+      {
+        "enabled": true,
+        "query": "geopolitics OR diplomacy OR sanctions",
+        "mode": "ArtList",
+        "max_records": 50,
+        "timespan": "24h",
+        "language": "english",
+        "country": null,
+        "category": "geo",
+        "profile": "world-news"
+      }
+    ],
+    "google_news": [
+      {
+        "enabled": true,
+        "query": "geopolitics OR international relations",
+        "language": "en",
+        "country": "US",
+        "ceid": null,
+        "max_results": 40,
+        "category": "geo",
+        "profile": "world-news"
+      },
+      {
+        "enabled": true,
+        "query": "时政 OR 国际",
+        "language": "zh-CN",
+        "country": "CN",
+        "ceid": "CN:zh-Hans",
+        "max_results": 40,
+        "category": "china",
+        "profile": "world-news"
+      }
+    ]
   },
   "collection": {
     "time_window_hours": 24
   },
   "digest": {
-    "max_items": null,
+    "max_items": 40,
     "profile_order": [
       "tech-news",
       "tech-blog",
-      "finance-news"
+      "finance-news",
+      "world-news"
     ],
-    "category_groups": {},
+    "category_groups": {
+      "tech": {
+        "limit": 20,
+        "categories": ["ai-tools", "ai-ml", "ai-industry", "ai-research", "cuda", "linux"]
+      },
+      "world": {
+        "limit": 12,
+        "categories": ["world", "geo", "china"]
+      },
+      "finance": {
+        "limit": 8,
+        "categories": ["finance", "equities"]
+      }
+    },
     "default_group": "other",
-    "default_group_limit": null
+    "default_group_limit": 5
   },
   "webhook": {
     "enabled": false,

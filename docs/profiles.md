@@ -20,6 +20,11 @@ profiles/
 |   |-- match.md
 |   |-- analysis.md
 |   `-- enrichment.md
+|-- world-news/
+|   |-- profile.json
+|   |-- match.md
+|   |-- analysis.md
+|   `-- enrichment.md
 |-- tech-news/
 |   |-- profile.json
 |   |-- match.md
@@ -42,6 +47,7 @@ profiles/
 | Profile | Purpose | Output |
 | --- | --- | --- |
 | `finance-news` | Macroeconomics, markets, company finance, and economically material policy | Concise summary, necessary background, and optional direct impact |
+| `world-news` | Geopolitics, diplomacy, governance, and general public-affairs reporting | Concise summary, necessary background, and optional direct impact |
 | `tech-news` | Timely releases, incidents, research results, and technology-industry developments | Compact summary and background with optional impact and community discussion |
 | `tech-blog` | Long-form engineering deep dives, tutorials, investigations, retrospectives, and technical arguments | Required background, solution, and takeaway sections |
 
