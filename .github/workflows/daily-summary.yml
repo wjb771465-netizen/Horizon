@@ -2,8 +2,8 @@ name: Daily Horizon Summary
 
 on:
   schedule:
-    # TEMP verify: 10:00 Asia/Shanghai (= 02:00 UTC). Revert to '0 22 * * *' after.
-    - cron: '0 2 * * *'
+    # TEMP verify: 15:00 Asia/Shanghai (= 07:00 UTC). Revert to '0 22 * * *' after.
+    - cron: '0 7 * * *'
   workflow_dispatch:
 
 jobs:
