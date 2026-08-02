@@ -9,12 +9,13 @@ Env (required for filter):
   EMAIL_PASSWORD, DIGEST_FROM
 
 Env (required for send):
-  DIGEST_TO, SILICONFLOW_API_KEY
+  DIGEST_TO, DEEPSEEK_API_KEY
 
 Env (optional):
   SMTP_SERVER / IMAP_SERVER (inferred from DIGEST_FROM domain)
   SMTP_PORT (465), IMAP_PORT (993)
   DIGEST_SENDER_NAME (default Ruby)
+  DIGEST_LLM_BASE / DIGEST_LLM_MODEL / DIGEST_LLM_API_KEY / DIGEST_LLM_TIMEOUT
 """
 
 from __future__ import annotations
@@ -257,12 +258,16 @@ def llm_greeting(
     report_date: str | None,
 ) -> str:
     """Generate Ruby-persona greeting that summarizes this digest."""
-    api_key = os.environ.get("SILICONFLOW_API_KEY", "").strip()
+    api_key = (
+        os.environ.get("DIGEST_LLM_API_KEY", "").strip()
+        or os.environ.get("DEEPSEEK_API_KEY", "").strip()
+        or os.environ.get("SILICONFLOW_API_KEY", "").strip()
+    )
     if not api_key:
-        raise SystemExit("missing required env: SILICONFLOW_API_KEY")
+        raise SystemExit("missing required env: DEEPSEEK_API_KEY")
 
-    base = os.environ.get("DIGEST_LLM_BASE", "https://api.siliconflow.cn/v1").rstrip("/")
-    model = os.environ.get("DIGEST_LLM_MODEL", "deepseek-ai/DeepSeek-V3.2")
+    base = os.environ.get("DIGEST_LLM_BASE", "https://api.deepseek.com").rstrip("/")
+    model = os.environ.get("DIGEST_LLM_MODEL", "deepseek-v4-flash")
 
     brief = {
         "date": report_date or datetime.now(SHANGHAI).date().isoformat(),
