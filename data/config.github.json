@@ -1,18 +1,13 @@
 {
-  "version": "1.0",
   "ai": {
     "provider": "openai",
+    "provider_chain": "openai,deepseek",
     "model": "deepseek-ai/DeepSeek-V4-Flash",
     "base_url": "https://api.siliconflow.cn/v1",
     "api_key_env": "SILICONFLOW_API_KEY",
     "temperature": 0.3,
     "max_tokens": 8192,
-    "request_timeout": 15.0,
-    "fallback": {
-      "provider": "deepseek",
-      "model": "deepseek-v4-flash",
-      "api_key_env": "DEEPSEEK_API_KEY"
-    },
+    "throttle_sec": 1,
     "languages": [
       "zh",
       "en"
@@ -20,66 +15,123 @@
     "analysis_concurrency": 5,
     "enrichment_concurrency": 5
   },
+  "processing": {
+    "profiles_dir": "profiles",
+    "default_profile": "tech-news",
+    "profile_settings": {
+      "tech-news": {
+        "threshold": 7.0,
+        "topic_dedup": true
+      },
+      "tech-blog": {
+        "threshold": 4.0,
+        "topic_dedup": false
+      },
+      "finance-news": {
+        "threshold": 7.0,
+        "topic_dedup": true
+      }
+    }
+  },
   "sources": {
     "github": [
       {
         "type": "user_events",
         "username": "karpathy",
-        "enabled": true
+        "enabled": true,
+        "profile": "tech-news"
       },
       {
         "type": "user_events",
         "username": "ggerganov",
-        "enabled": true
+        "enabled": true,
+        "profile": "tech-news"
       },
       {
         "type": "repo_releases",
         "owner": "vllm-project",
         "repo": "vllm",
-        "enabled": true
+        "enabled": true,
+        "profile": "tech-news"
       },
       {
         "type": "repo_releases",
         "owner": "sgl-project",
         "repo": "sglang",
-        "enabled": true
+        "enabled": true,
+        "profile": "tech-news"
       },
       {
         "type": "repo_releases",
         "owner": "triton-lang",
         "repo": "triton",
-        "enabled": true
+        "enabled": true,
+        "profile": "tech-news"
       }
     ],
     "hackernews": {
       "enabled": true,
       "fetch_top_stories": 30,
-      "min_score": 150
+      "min_score": 150,
+      "profile": "tech-news"
     },
     "rss": [
       {
         "name": "Simon Willison",
         "url": "https://simonwillison.net/atom/everything/",
         "enabled": true,
-        "category": "ai-tools"
+        "category": "ai-tools",
+        "profile": "tech-news"
+      },
+      {
+        "name": "CNBC Finance",
+        "url": "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=10000664",
+        "enabled": true,
+        "category": "finance",
+        "profile": "finance-news",
+        "content_extractor": "trafilatura"
       },
       {
         "name": "Hugging Face Blog",
         "url": "https://huggingface.co/blog/feed.xml",
         "enabled": true,
-        "category": "ai-ml"
+        "category": "ai-ml",
+        "profile": "tech-news"
+      },
+      {
+        "name": "Semianalysis",
+        "url": "https://newsletter.semianalysis.com/feed",
+        "enabled": true,
+        "category": "semiconductors",
+        "profile": "tech-news"
       },
       {
         "name": "OpenAI Blog",
         "url": "https://openai.com/blog/rss.xml",
         "enabled": true,
-        "category": "ai-industry"
+        "category": "ai-industry",
+        "profile": "tech-news"
       },
       {
         "name": "Anthropic Research",
         "url": "https://www.anthropic.com/research/feed",
         "enabled": false,
-        "category": "ai-research"
+        "category": "ai-research",
+        "profile": "tech-news"
+      },
+      {
+        "name": "GitHub Trending - Daily",
+        "url": "https://mshibanami.github.io/GitHubTrendingRSS/daily/all.xml",
+        "enabled": true,
+        "category": "github-trending",
+        "profile": "tech-news"
+      },
+      {
+        "name": "LWN.net",
+        "url": "https://lwn.net/headlines/full_text?key=${LWN_KEY}",
+        "enabled": true,
+        "category": "linux-kernel",
+        "profile": "tech-news"
       }
     ],
     "reddit": {
@@ -87,23 +139,36 @@
       "subreddits": [
         {
           "subreddit": "MachineLearning",
+          "enabled": true,
           "sort": "hot",
+          "time_filter": "day",
           "fetch_limit": 15,
-          "min_score": 60
+          "min_score": 60,
+          "profile": "tech-news"
         },
         {
           "subreddit": "LocalLLaMA",
+          "enabled": true,
           "sort": "hot",
+          "time_filter": "day",
           "fetch_limit": 15,
-          "min_score": 60
+          "min_score": 60,
+          "profile": "tech-news"
         }
       ],
       "users": [],
       "fetch_comments": 5
     },
     "telegram": {
-      "enabled": false,
-      "channels": []
+      "enabled": true,
+      "channels": [
+        {
+          "channel": "zaihuapd",
+          "enabled": true,
+          "fetch_limit": 20,
+          "profile": ["tech-news", "finance-news"]
+        }
+      ]
     },
     "ossinsight": {
       "enabled": true,
@@ -111,12 +176,23 @@
       "languages": ["All", "Python", "TypeScript", "Rust"],
       "keywords": ["llm", "gpt", "rag", "agent", "inference", "cuda", "triton", "vector", "diffusion", "transformer", "embedding", "vllm", "sglang"],
       "min_stars": 10,
-      "max_items": 30
+      "max_items": 30,
+      "profile": "tech-news"
     }
   },
-  "filtering": {
-    "ai_score_threshold": 8.0,
+  "collection": {
     "time_window_hours": 24
+  },
+  "digest": {
+    "max_items": null,
+    "profile_order": [
+      "tech-news",
+      "tech-blog",
+      "finance-news"
+    ],
+    "category_groups": {},
+    "default_group": "other",
+    "default_group_limit": null
   },
   "webhook": {
     "enabled": false,
