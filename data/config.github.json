@@ -6,10 +6,9 @@
     "api_key_env": "SILICONFLOW_API_KEY",
     "temperature": 0.3,
     "max_tokens": 8192,
-    "throttle_sec": 1,
+    "throttle_sec": 0,
     "languages": [
-      "zh",
-      "en"
+      "zh"
     ],
     "analysis_concurrency": 5,
     "enrichment_concurrency": 5
@@ -31,7 +30,7 @@
         "topic_dedup": true
       },
       "world-news": {
-        "threshold": 7.0,
+        "threshold": 8.0,
         "topic_dedup": true
       }
     }
@@ -198,7 +197,7 @@
     },
     "gdelt": [
       {
-        "enabled": true,
+        "enabled": false,
         "query": "geopolitics OR diplomacy OR sanctions",
         "mode": "ArtList",
         "max_records": 50,
@@ -216,7 +215,7 @@
         "language": "en",
         "country": "US",
         "ceid": null,
-        "max_results": 40,
+        "max_results": 12,
         "category": "geo",
         "profile": "world-news"
       },
@@ -226,7 +225,7 @@
         "language": "zh-CN",
         "country": "CN",
         "ceid": "CN:zh-Hans",
-        "max_results": 40,
+        "max_results": 12,
         "category": "china",
         "profile": "world-news"
       }
@@ -236,7 +235,7 @@
     "time_window_hours": 24
   },
   "digest": {
-    "max_items": 40,
+    "max_items": 18,
     "profile_order": [
       "tech-news",
       "tech-blog",
@@ -245,7 +244,7 @@
     ],
     "category_groups": {
       "tech": {
-        "limit": 18,
+        "limit": 10,
         "categories": [
           "ai-tools",
           "ai-ml",
@@ -257,16 +256,16 @@
         ]
       },
       "world": {
-        "limit": 12,
+        "limit": 5,
         "categories": ["world", "geo", "china"]
       },
       "finance": {
-        "limit": 8,
+        "limit": 3,
         "categories": ["finance", "equities"]
       }
     },
     "default_group": "other",
-    "default_group_limit": 5
+    "default_group_limit": 2
   },
   "webhook": {
     "enabled": false,
