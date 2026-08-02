@@ -17,19 +17,19 @@
     "default_profile": "tech-news",
     "profile_settings": {
       "tech-news": {
-        "threshold": 7.0,
+        "threshold": 7.5,
         "topic_dedup": true
       },
       "tech-blog": {
-        "threshold": 4.0,
+        "threshold": 4.5,
         "topic_dedup": false
       },
       "finance-news": {
-        "threshold": 7.0,
+        "threshold": 9.0,
         "topic_dedup": true
       },
       "world-news": {
-        "threshold": 8.0,
+        "threshold": 9.0,
         "topic_dedup": true
       }
     }
@@ -234,7 +234,7 @@
     "time_window_hours": 24
   },
   "digest": {
-    "max_items": 18,
+    "max_items": 14,
     "profile_order": [
       "tech-news",
       "tech-blog",
@@ -243,7 +243,7 @@
     ],
     "category_groups": {
       "tech": {
-        "limit": 10,
+        "limit": 12,
         "categories": [
           "ai-tools",
           "ai-ml",
@@ -255,16 +255,16 @@
         ]
       },
       "world": {
-        "limit": 5,
+        "limit": 2,
         "categories": ["world", "geo", "china"]
       },
       "finance": {
-        "limit": 3,
+        "limit": 2,
         "categories": ["finance", "equities"]
       }
     },
     "default_group": "other",
-    "default_group_limit": 2
+    "default_group_limit": 6
   },
   "webhook": {
     "enabled": false,

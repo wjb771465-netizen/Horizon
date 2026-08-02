@@ -2,8 +2,8 @@ name: Daily Horizon Summary
 
 on:
   schedule:
-    # TEMP verify: 15:00 Asia/Shanghai (= 07:00 UTC). Revert to '0 22 * * *' after.
-    - cron: '0 7 * * *'
+    # 06:00 Asia/Shanghai (= 22:00 UTC previous calendar day)
+    - cron: '0 22 * * *'
   workflow_dispatch:
 
 jobs:
@@ -13,8 +13,7 @@ jobs:
       contents: write
     env:
       TZ: Asia/Shanghai
-      # TEMP verify: always due. Revert to 3 (or unset) after.
-      PUBLISH_MIN_GAP_DAYS: "0"
+      PUBLISH_MIN_GAP_DAYS: "3"
 
     steps:
       - name: Checkout code
