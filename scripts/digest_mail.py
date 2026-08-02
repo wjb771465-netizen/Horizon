@@ -43,8 +43,9 @@ SUMMARIES = ROOT / "data" / "summaries"
 BLOCKED_PATH = ROOT / "data" / "mail_blocked.json"
 
 DATE_RE = re.compile(r"^horizon-(\d{4}-\d{2}-\d{2})-(zh|en|trending)\.md$")
+# Legacy summaries used "## [title](url)"; profile digests use "### [title](url)".
 ITEM_HEAD_RE = re.compile(
-    r"^##\s+\[(.+?)\]\(([^)]+)\)\s*(.*)$"
+    r"^#{2,3}\s+\[(.+?)\]\(([^)]+)\)\s*(.*)$"
 )
 TREND_HEAD_RE = re.compile(
     r"^###\s+[^\[]*\[([^\]]+)\]\(([^)]+)\)\s*$"
@@ -105,25 +106,40 @@ def extract_zh_items(path: Path, limit: int = 6) -> list[dict[str, str]]:
             i += 1
             continue
         title, url, score = m.group(1), m.group(2), m.group(3).strip()
+        # Skip TOC anchors like (#item-tech-news-1); keep http(s) article links.
+        if not url.startswith(("http://", "https://")):
+            i += 1
+            continue
         i += 1
         blurb_parts: list[str] = []
         while i < len(lines):
             raw = lines[i].strip()
-            if raw.startswith("## ") or raw == "---":
+            if (
+                raw.startswith("## ")
+                or raw.startswith("### ")
+                or raw.startswith("<a id=")
+                or raw == "---"
+            ):
                 break
             if (
                 not raw
                 or raw.startswith("<")
                 or raw.startswith("**背景")
+                or raw.startswith("**「背景」")
+                or raw.startswith("**「影响」")
                 or raw.startswith("**社区")
                 or raw.startswith("**标签")
                 or raw.startswith("hackernews")
                 or raw.startswith("rss ")
-                or " · " in raw and ("Jul " in raw or "Jun " in raw or "May " in raw)
+                or raw.startswith("reddit ")
+                or raw.startswith("telegram ")
+                or raw.startswith("github ")
+                or (" · " in raw and re.search(r"\d+月\d+日|\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\b", raw))
             ):
                 i += 1
                 if blurb_parts and (
                     raw.startswith("**背景")
+                    or raw.startswith("**「背景」")
                     or raw.startswith("hackernews")
                     or (raw and " · " in raw)
                 ):

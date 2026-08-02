@@ -12,8 +12,15 @@ jobs:
       TZ: Asia/Shanghai
     steps:
       - uses: actions/checkout@v6
-      - name: Filter inbox (silent)
+      - name: Filter inbox (and send on manual runs)
         env:
           EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
           DIGEST_FROM: ${{ secrets.DIGEST_FROM }}
-        run: python3 scripts/digest_mail.py --filter-only
+          DIGEST_TO: ${{ secrets.DIGEST_TO }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            python3 scripts/digest_mail.py
+          else
+            python3 scripts/digest_mail.py --filter-only
+          fi
