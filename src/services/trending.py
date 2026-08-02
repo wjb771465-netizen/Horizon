@@ -12,6 +12,7 @@ import sys
 from datetime import datetime
 from pathlib import Path
 from typing import List
+from zoneinfo import ZoneInfo
 
 import httpx
 from dotenv import load_dotenv
@@ -97,7 +98,7 @@ def build_prompt(repos: List[dict], max_repos: int) -> str:
         stars = r.get("stars", "?")
         lines.append(f"[{i}] {name} ({lang}) +{stars}⭐\n    {desc}")
 
-    today = datetime.now().strftime("%Y-%m-%d")
+    today = datetime.now(ZoneInfo("Asia/Shanghai")).strftime("%Y-%m-%d")
     return f"以下是 {today} GitHub 上 AI 相关的热门仓库：\n\n" + "\n\n".join(lines)
 
 
@@ -145,7 +146,7 @@ async def run_trending(
         console.print("[red]AI response parse failed, raw output:[/red]")
         return response
 
-    today = datetime.now().strftime("%Y-%m-%d")
+    today = datetime.now(ZoneInfo("Asia/Shanghai")).strftime("%Y-%m-%d")
     theme = data.get("theme", "AI 编程生态活跃")
     top5 = data.get("top5", [])
 

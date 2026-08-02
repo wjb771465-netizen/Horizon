@@ -2,7 +2,8 @@ name: Daily Horizon Summary
 
 on:
   schedule:
-    - cron: '0 22 */3 * *'  # Every 3 days at 06:00 UTC+8
+    # TEMP verify: 10:00 Asia/Shanghai (= 02:00 UTC). Revert to '0 22 * * *' after.
+    - cron: '0 2 * * *'
   workflow_dispatch:
 
 jobs:
@@ -10,35 +11,54 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    env:
+      TZ: Asia/Shanghai
+      # TEMP verify: always due. Revert to 3 (or unset) after.
+      PUBLISH_MIN_GAP_DAYS: "0"
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
 
+      - name: Interval gate
+        id: gate
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            python3 scripts/publish_due.py --force
+          else
+            python3 scripts/publish_due.py
+          fi
+
       - name: Set up Python
+        if: steps.gate.outputs.due == 'true'
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
       - name: Install uv
+        if: steps.gate.outputs.due == 'true'
         uses: astral-sh/setup-uv@v3
 
       - name: Install dependencies
+        if: steps.gate.outputs.due == 'true'
         run: uv sync
 
       - name: Run Horizon
+        if: steps.gate.outputs.due == 'true'
         env:
           SILICONFLOW_API_KEY: ${{ secrets.SILICONFLOW_API_KEY }}
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
         run: uv run horizon --quiet
 
       - name: Run Trending
+        if: steps.gate.outputs.due == 'true'
         env:
           SILICONFLOW_API_KEY: ${{ secrets.SILICONFLOW_API_KEY }}
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
         run: uv run horizon-trending
 
       - name: Commit and push reports
+        if: steps.gate.outputs.due == 'true'
         run: |
           git add -f data/summaries/*.md
           if git diff --cached --quiet; then
@@ -51,6 +71,7 @@ jobs:
           fi
 
       - name: Filter inbox and send digest
+        if: steps.gate.outputs.due == 'true'
         env:
           EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
           DIGEST_FROM: ${{ secrets.DIGEST_FROM }}

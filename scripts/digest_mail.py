@@ -2,7 +2,7 @@
 """Cloud digest: IMAP blacklist filter + SMTP briefing email.
 
 Always filters the inbox. Sends a briefing email only when there is a
-Chinese summary dated today (UTC on GitHub runners). Use --filter-only
+Chinese summary dated today (Asia/Shanghai). Use --filter-only
 to skip sending entirely (daily silent filter).
 
 Env (required for filter):
@@ -28,11 +28,14 @@ import re
 import smtplib
 import sys
 import urllib.request
-from datetime import date
+from datetime import date, datetime
 from email.header import decode_header, make_header
 from email.mime.text import MIMEText
 from email.utils import parseaddr
 from pathlib import Path
+from zoneinfo import ZoneInfo
+
+SHANGHAI = ZoneInfo("Asia/Shanghai")
 
 ROOT = Path(__file__).resolve().parents[1]
 SUMMARIES = ROOT / "data" / "summaries"
@@ -262,7 +265,7 @@ def llm_greeting(
     model = os.environ.get("DIGEST_LLM_MODEL", "deepseek-ai/DeepSeek-V3.2")
 
     brief = {
-        "date": report_date or date.today().isoformat(),
+        "date": report_date or datetime.now(SHANGHAI).date().isoformat(),
         "filtered_count": filtered_n,
         "news": [
             {
@@ -455,7 +458,7 @@ def main(argv: list[str] | None = None) -> None:
 
     zh = latest_summary("zh")
     report_date = _summary_date(zh)
-    today = date.today().isoformat()
+    today = datetime.now(SHANGHAI).date().isoformat()
     if report_date != today:
         print(f"no publication for {today} (latest={report_date}), skip send")
         return
