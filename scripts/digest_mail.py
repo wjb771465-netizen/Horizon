@@ -266,6 +266,22 @@ def _has_cjk(text: str) -> bool:
     return sum(1 for c in text if "\u4e00" <= c <= "\u9fff") >= 2
 
 
+def load_ai_config() -> dict:
+    """Read the `ai` block from data/ config (config.json, else config.github.json).
+
+    Keeps the email greeting model in sync with the rest of the pipeline so
+    model / base_url / key only need configuring in one place.
+    """
+    for name in ("config.json", "config.github.json"):
+        path = ROOT / "data" / name
+        if path.exists():
+            try:
+                return json.loads(path.read_text(encoding="utf-8")).get("ai", {})
+            except (json.JSONDecodeError, OSError):
+                return {}
+    return {}
+
+
 def llm_greeting(
     zh_items: list[dict[str, str]],
     theme: str,
@@ -274,16 +290,19 @@ def llm_greeting(
     report_date: str | None,
 ) -> str:
     """Generate Ruby-persona greeting that summarizes this digest."""
+    ai = load_ai_config()
+    key_env = ai.get("api_key_env", "SILICONFLOW_API_KEY")
     api_key = (
         os.environ.get("DIGEST_LLM_API_KEY", "").strip()
+        or os.environ.get(key_env, "").strip()
         or os.environ.get("DEEPSEEK_API_KEY", "").strip()
         or os.environ.get("SILICONFLOW_API_KEY", "").strip()
     )
     if not api_key:
         raise SystemExit("missing required env: DEEPSEEK_API_KEY")
 
-    base = os.environ.get("DIGEST_LLM_BASE", "https://api.deepseek.com").rstrip("/")
-    model = os.environ.get("DIGEST_LLM_MODEL", "deepseek-v4-flash")
+    base = os.environ.get("DIGEST_LLM_BASE", ai.get("base_url", "https://api.siliconflow.cn/v1")).rstrip("/")
+    model = os.environ.get("DIGEST_LLM_MODEL", ai.get("model", "deepseek-ai/DeepSeek-V4-Flash"))
 
     brief = {
         "date": report_date or datetime.now(SHANGHAI).date().isoformat(),
