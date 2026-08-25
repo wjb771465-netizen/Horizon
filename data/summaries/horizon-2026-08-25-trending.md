@@ -1,25 +1,25 @@
 # GitHub 今日热门 — 2026-08-25
 
-**今日主题：AI Agent技能与记忆工具**
+**今日主题：AI Agent技能与工具生态**
 
 ## 🏆 Top 5
 
-### 1️⃣ [virgiliojr94/book-to-skill](https://github.com/virgiliojr94/book-to-skill)
-将技术书籍PDF转化为Claude Code技能，便于学习、参考和工作中使用。
-> 💡 把书籍直接变成可用的Agent技能，实用性强
+### 1️⃣ [freestylefly/awesome-gpt-image-2](https://github.com/freestylefly/awesome-gpt-image-2)
+GPT-Image2工业级提示词引擎，含470+逆向案例和20+模板。
+> 💡 提示词工程实用资源，案例丰富
 
-### 2️⃣ [Leonxlnx/unlazy](https://github.com/Leonxlnx/unlazy)
-针对AI Agent的防懒惰技能，通过深度树方法将任务分层并分配完整时间预算，抑制模型偷懒和过早完成。
-> 💡 直击AI模型偷懒痛点，方法新颖
+### 2️⃣ [stablyai/orca](https://github.com/stablyai/orca)
+面向并行代理集群的ADE，支持自带订阅运行任意编码代理。
+> 💡 多代理协作开发新范式
 
-### 3️⃣ [akitaonrails/ai-memory](https://github.com/akitaonrails/ai-memory)
-为Agent编码CLI提供长期记忆解决方案，并支持不同Agent供应商之间的交接。
-> 💡 解决Agent长期记忆与协作交接难题
+### 3️⃣ [MadsLorentzen/ai-job-search](https://github.com/MadsLorentzen/ai-job-search)
+基于Claude Code的AI求职框架，自动评估职位、定制简历和准备面试。
+> 💡 AI落地求职全流程自动化
 
-### 4️⃣ [stablyai/orca](https://github.com/stablyai/orca)
-面向并行Agent集群的ADE（Agent开发环境），支持用自己的订阅运行任意编码Agent，覆盖桌面和移动端。
-> 💡 并行Agent管理利器，跨平台支持
+### 4️⃣ [blader/humanizer](https://github.com/blader/humanizer)
+Agent技能，用于去除文本中的AI生成痕迹。
+> 💡 解决AI文本同质化痛点
 
-### 5️⃣ [mukul975/Anthropic-Cybersecurity-Skills](https://github.com/mukul975/Anthropic-Cybersecurity-Skills)
-817个结构化网络安全技能，映射到MITRE ATT&CK等6大框架，兼容Claude Code、Copilot等20+平台。
-> 💡 大规模安全技能库，覆盖全面且合规
+### 5️⃣ [akitaonrails/ai-memory](https://github.com/akitaonrails/ai-memory)
+为编码CLI代理提供长期记忆，支持不同代理供应商间交接。
+> 💡 补足代理上下文记忆短板

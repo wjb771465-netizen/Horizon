@@ -1,41 +1,40 @@
 # Horizon 每日速递 - 2026-08-25
 
-> 从 108 条内容中筛选出 1 条重要资讯。
+> 从 134 条内容中筛选出 1 条重要资讯。
 
 ---
 
 **科技新闻**
-1. [seL4 在 AArch64 上的安全证明完成](#item-tech-news-1) ⭐️ 8.0/10
+1. [seL4 完成 AArch64 安全证明，形式化验证里程碑](#item-tech-news-1) ⭐️ 8.0/10
 
 ---
 
 ## 科技新闻
 
 <a id="item-tech-news-1"></a>
-### [seL4 在 AArch64 上的安全证明完成](https://proofcraft.systems/news-2026/#2026-08-21) ⭐️ 8.0/10
+### [seL4 完成 AArch64 安全证明，形式化验证里程碑](https://proofcraft.systems/news-2026/#2026-08-21) ⭐️ 8.0/10
 
-seL4 微内核的安全证明已在 AArch64 架构上完成，这是形式化验证领域的一个重要里程碑。该成果由 Proofcraft Systems 于 2026-08-21 发布，意味着 seL4 的机密性、完整性等安全属性在 AArch64 上获得了机器可验证的证明。不过社区提醒，当前证明复盖的是非 MCS（混合关键性系统）和单核配置，并不包含多核或 MCS 扩展。这一进展对安全关键型部署有直接意义，但实际采用仍受限于生态成熟度以及与 Linux 兼容性等问题。
+seL4 微内核的 AArch64 安全证明现已完成，这是 ARM 64 位系统形式化验证的重要进展。该成果由 Proofcraft 于 2026-08-21 发布，覆盖 AArch64 架构的安全性质，但社区指出其范围限于非 MCS（混合关键性系统）和单核（unicore）配置，且不包含侧信道时序攻击的证明。对追求高可信、形式化验证内核的开发者以及嵌入式、军事等高风险领域而言，这仍是高价值里程碑，但实际部署中仍需注意这些边界条件。
 
 hackernews · snvzz · 8月24日 11:32 · [社区讨论](https://news.ycombinator.com/item?id=49418255)
 
-**「背景」** seL4 是一个以能力（capability）机制实现访问控制的微内核，其安全模型通过形式化验证来保证内核的保密性等安全属性。这些证明使用 Isabelle/HOL 定理证明器编写，并托管在 seL4/l4v 仓库中，针对特定版本和配置的 seL4 进行验证。此次完成的是 AArch64（64 位 ARM 架构）上的保密性证明，意味着在该架构上，运行于 seL4 之上的应用程序被数学上证明无法未经授权获取信息。
+**「背景」** seL4 是一个从设计到实现都经过形式验证的微内核，其验证工作始于 2009 年发表的 SOSP 论文，涵盖功能正确性、信息流非干扰以及用户级系统初始化等证明，并可配置为分离内核以提供强隔离。官方页面显示，在 AArch64 架构上完成安全证明后，seL4 现在能以数学证明的形式保证运行于其上的应用无法在未获授权的情况下获取信息，即强制执行机密性。
 
-**「影响」** 对在 AArch64 上部署 seL4 的开发者和机构而言，安全证明的完成意味着 64 位 ARM 平台现在也获得了与先前架构相当的形式化安全保证，可进一步支撑汽车、军事和嵌入式等高可信场景的采用。需要明确的是，这些证明复盖的是非 MCS（混合关键性系统）的单核配置，多核与 MCS 配置仍不在证明范围内；同时，seL4 基金会也指出大多数实际部署并不会全部原生运行在 seL4 上，因此实际安全收益仍取决于整体系统集成。
+**「影响」** 这一里程碑意味着，在公告所列假设下，AArch64 上运行的 seL4 实现代码现已具备正式证明的安全隔离保证，使基于 64 位 Arm 的高保证系统可以更可靠地依赖内核的隔离能力。
 
-**「社区讨论」** 评论中既有对成果的认可，也提出保留意见：有观点认为侧信道时序攻击可能使该结果失效；另有人提醒细则限定于非 MCS、单核配置。还有讨论关注实际使用 seL4 的操作系统（如 GenodeOS、LionsOS、某中国车企的 hypervisor），以及是否需要原生 seL4/Linux 才能宣称改善系统安全。
+**「社区讨论」** 评论中有人提醒细看适用范围：当前证明针对非 MCS 与单核配置，且侧信道时序攻击可能使结果失效；另有讨论关注实际使用 seL4 的系统（如 GenodeOS、LionsOS 及某中国车企的 hypervisor 部署），并认为若想真正改善系统安全，需要原生 seL4/Linux 支持。
 
 <details><summary>参考链接</summary>
 <ul>
 <li><a href="https://sel4.systems/">The seL4 Microkernel | seL4</a></li>
-<li><a href="https://sel4.systems/Verification/proofs.html">seL4 Proofs | seL4</a></li>
-<li><a href="https://docs.sel4.systems/projects/sel4/verified-configurations.html">Verified Configurations | seL4 docs</a></li>
-<li><a href="https://sel4.systems/About/seL4-whitepaper.pdf">The seL4® Foundation https://sel4.systems/Foundation The seL4 Microkernel</a></li>
-<li><a href="https://sel4.systems/">The seL4 Microkernel | seL4</a></li>
+<li><a href="https://sel4.systems/Research/pdfs/comprehensive-formal-verification-os-microkernel.pdf">2 Comprehensive Formal Veriﬁcation of an OS Microkernel</a></li>
+<li><a href="https://www.sigops.org/s/conferences/sosp/2009/papers/klein-sosp09.pdf">seL4: Formal Veriﬁcation of an OS Kernel</a></li>
+<li><a href="https://lists.sel4.systems/hyperkitty/list/announce@sel4.systems/thread/ZL6HYXH3PKI6XUVKMPTLIPKQMWJW7N7M/">seL 4 security proofs now complete on AArch 64 ... - lists. sel 4 . systems</a></li>
 
 </ul>
 </details>
 
-**标签**: `#seL4`, `#formal verification`, `#microkernel`, `#AArch64`, `#security`
+**标签**: `#seL4`, `#formal verification`, `#AArch64`, `#microkernel`, `#security`
 
 ---
 
