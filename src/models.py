@@ -199,6 +199,9 @@ class AIConfig(BaseModel):
     throttle_sec: float = 0.0
     analysis_concurrency: int = 1
     enrichment_concurrency: int = 1
+    # Merged into the request body by OpenAI-compatible clients (e.g.
+    # {"thinking": {"type": "disabled"}} for Zhipu GLM). Ignored elsewhere.
+    extra_body: Dict[str, Any] = Field(default_factory=dict)
     languages: List[str] = Field(default_factory=lambda: ["en"])
     # Azure OpenAI specific; required when provider == AZURE
     azure_endpoint_env: Optional[str] = None

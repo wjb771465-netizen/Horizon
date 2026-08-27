@@ -1,9 +1,14 @@
 {
   "ai": {
     "provider": "openai",
-    "model": "deepseek-ai/DeepSeek-V4-Flash",
-    "base_url": "https://api.siliconflow.cn/v1",
-    "api_key_env": "SILICONFLOW_API_KEY",
+    "model": "glm-4.7",
+    "base_url": "https://open.bigmodel.cn/api/paas/v4",
+    "api_key_env": "ZHIPU_API_KEY",
+    "extra_body": {
+      "thinking": {
+        "type": "disabled"
+      }
+    },
     "temperature": 0.3,
     "max_tokens": 8192,
     "throttle_sec": 0,

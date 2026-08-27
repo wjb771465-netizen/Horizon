@@ -328,6 +328,8 @@ class OpenAIClient(AIClient):
             request_kwargs["temperature"] = temperature
         if self.provider not in self._NO_RESPONSE_FORMAT:
             request_kwargs["response_format"] = {"type": "json_object"}
+        if self.config.extra_body:
+            request_kwargs["extra_body"] = self.config.extra_body
         return await self.client.chat.completions.create(**request_kwargs)
 
     @staticmethod
