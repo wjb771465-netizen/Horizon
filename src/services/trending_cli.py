@@ -7,7 +7,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 from rich.console import Console
 
-from .trending import run_trending, print_trending, DEFAULT_KEYWORDS, DEFAULT_LANGUAGES
+from .trending import run_trending, print_trending, DEFAULT_KEYWORDS
 
 console = Console()
 
@@ -23,8 +23,8 @@ def main() -> None:
         help="Filter keywords (space-separated). Default: AI-related keywords.",
     )
     parser.add_argument(
-        "--languages", nargs="*", default=None,
-        help="Programming languages to track. Default: All Python TypeScript Rust.",
+        "--since", default="daily", choices=["daily", "weekly", "monthly"],
+        help="Trending window (default: daily).",
     )
     parser.add_argument(
         "--max-repos", type=int, default=15,
@@ -42,7 +42,7 @@ def main() -> None:
             run_trending(
                 data_dir="data",
                 keywords=args.keywords,
-                languages=args.languages,
+                since=args.since,
                 max_repos=args.max_repos,
             )
         )

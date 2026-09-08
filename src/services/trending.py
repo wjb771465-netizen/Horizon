@@ -7,7 +7,9 @@ Integrated as: horizon-trending CLI command.
 """
 
 import asyncio
+import html as html_mod
 import os
+import re
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -24,7 +26,7 @@ from ..storage.manager import StorageManager
 
 console = Console()
 
-OSSINSIGHT_URL = "https://api.ossinsight.io/v1/trends/repos"
+TRENDING_URL = "https://github.com/trending"
 
 DEFAULT_KEYWORDS = [
     "llm", "gpt", "rag", "agent", "inference", "cuda", "triton",
@@ -63,25 +65,44 @@ def _match_keywords(repo: dict, keywords: List[str]) -> bool:
     return any(kw in text_lower for kw in keywords)
 
 
-async def fetch_trending(languages: List[str]) -> List[dict]:
-    all_repos: dict[str, dict] = {}
-    async with httpx.AsyncClient(timeout=30) as client:
-        for lang in languages:
-            try:
-                resp = await client.get(
-                    OSSINSIGHT_URL,
-                    params={"period": "past_24_hours", "language": lang},
-                )
-                resp.raise_for_status()
-                data = resp.json()
-                for r in data.get("data", {}).get("rows", []):
-                    rid = r.get("repo_id")
-                    if rid and rid not in all_repos:
-                        all_repos[rid] = r
-            except Exception as e:
-                console.print(f"[yellow]  {lang}: {e}[/yellow]")
-    repos = list(all_repos.values())
-    repos.sort(key=lambda r: int(r.get("stars", 0)), reverse=True)
+def _clean_html(s: str) -> str:
+    s = re.sub(r"<svg.*?</svg>", "", s, flags=re.S)
+    s = re.sub(r"<[^>]+>", "", s)
+    return html_mod.unescape(s).strip()
+
+
+def _parse_trending_html(html: str) -> List[dict]:
+    """Parse github.com/trending page into repo dicts."""
+    repos = []
+    for row in html.split('class="Box-row"')[1:]:
+        m = re.search(r'<h2[^>]*>\s*<a[^>]*href="/([^"]+)"', row)
+        if not m:
+            continue
+        name = m.group(1).rstrip("/")
+        d = re.search(r'<p class="col-9[^"]*">\s*(.*?)\s*</p>', row, re.S)
+        desc = _clean_html(d.group(1)) if d else ""
+        lang_m = re.search(r'itemprop="programmingLanguage">([^<]+)<', row)
+        lang = lang_m.group(1) if lang_m else ""
+        today_m = re.search(r"([\d,]+)\s*stars (?:today|this week|this month)", row)
+        stars_today = int(today_m.group(1).replace(",", "")) if today_m else 0
+        repos.append({
+            "repo_id": name,
+            "repo_name": name,
+            "description": desc,
+            "primary_language": lang,
+            "stars": stars_today,
+        })
+    return repos
+
+
+async def fetch_trending(since: str = "daily") -> List[dict]:
+    async with httpx.AsyncClient(
+        timeout=30, headers={"User-Agent": "Horizon-Aggregator"}, follow_redirects=True
+    ) as client:
+        resp = await client.get(TRENDING_URL, params={"since": since})
+        resp.raise_for_status()
+        repos = _parse_trending_html(resp.text)
+    repos.sort(key=lambda r: r.get("stars", 0), reverse=True)
     return repos
 
 
@@ -96,7 +117,7 @@ def build_prompt(repos: List[dict], max_repos: int) -> str:
         desc = r.get("description", "") or "无描述"
         lang = r.get("primary_language", "?")
         stars = r.get("stars", "?")
-        lines.append(f"[{i}] {name} ({lang}) +{stars}⭐\n    {desc}")
+        lines.append(f"[{i}] {name} ({lang}) +{stars}⭐/今日\n    {desc}")
 
     today = datetime.now(ZoneInfo("Asia/Shanghai")).strftime("%Y-%m-%d")
     return f"以下是 {today} GitHub 上 AI 相关的热门仓库：\n\n" + "\n\n".join(lines)
@@ -105,13 +126,12 @@ def build_prompt(repos: List[dict], max_repos: int) -> str:
 async def run_trending(
     data_dir: str = "data",
     keywords: List[str] | None = None,
-    languages: List[str] | None = None,
+    since: str = "daily",
     max_repos: int = 15,
 ) -> str:
     if keywords is not None:
         global DEFAULT_KEYWORDS
         DEFAULT_KEYWORDS = keywords
-    langs = languages or DEFAULT_LANGUAGES
 
     # Load config for AI settings
     storage = StorageManager(data_dir=str(Path(data_dir)))
@@ -119,14 +139,15 @@ async def run_trending(
 
     # Fetch
     console.print("[bold cyan]📊 Fetching GitHub trending repos...[/bold cyan]")
-    repos = await fetch_trending(langs)
-    console.print(f"   {len(repos)} unique repos across {len(langs)} languages")
+    repos = await fetch_trending(since)
+    console.print(f"   {len(repos)} repos from github.com/trending ({since})")
 
     # Filter
     filtered = [r for r in repos if _match_keywords(r, DEFAULT_KEYWORDS)]
     console.print(f"   {len(filtered)} AI-related repos after keyword filter")
 
     if not filtered:
+        console.print("[yellow]   No AI-related repos today — keeping previous report untouched.[/yellow]")
         return "今日暂无 AI 相关热门仓库。"
 
     # AI summary
